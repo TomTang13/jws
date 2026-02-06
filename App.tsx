@@ -6,9 +6,9 @@ import { LandingPage } from './components/LandingPage';
 import { QRModal } from './components/QRModal';
 import { ScannerOverlay } from './components/ScannerOverlay';
 import { motion, AnimatePresence } from 'framer-motion';
-import { supabase, testConnection } from './supabase';
-import { signUp, signIn, signOut, onAuthChange, getCurrentUser, updateProfile, type UserProfile } from './auth';
-import { getLevels, getQuests, getShopItems, getUserCompletedQuests, getUserInventory, addQuestRecord, addRedemptionRecord } from './dataService';
+import { supabase, testConnection } from './src/supabase';
+import { signUp, signIn, signOut, onAuthChange, getCurrentUser, updateProfile, type UserProfile } from './src/auth';
+import { getLevels, getQuests, getShopItems, getUserCompletedQuests, getUserInventory, addQuestRecord, addRedemptionRecord } from './src/dataService';
 
 const App: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
