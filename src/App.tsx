@@ -89,31 +89,50 @@ const App: React.FC = () => {
     setUserInventory(inventory);
   }
 
-  // 登录/注册处理
-  const handleLogin = async (nickname: string, password: string, isRegister: boolean) => {
+  // 登录/注册处理（带 preUserId）
+  const handleLogin = async (nickname: string, password: string, preUserId: string) => {
     setIsLoading(true);
     
     try {
-      let result;
-      if (isRegister) {
-        result = await signUp(nickname, password, inviteToken || undefined);
-        // 注册成功后清除邀请码
-        if (!result.error && inviteToken) {
-          sessionStorage.removeItem('jws_invite_token');
-          setInviteToken(null);
-        }
-      } else {
-        result = await signIn(nickname, password);
-      }
+      // 注册并关联 pre_users
+      const result = await signUp(nickname, password, preUserId);
       
       if (result.error) {
         alert(result.error.message);
         return false;
       }
       
+      // 清除邀请码
+      sessionStorage.removeItem('jws_invite_token');
+      setInviteToken(null);
+      
       return true;
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // 自动登录（已使用邀请码的用户）
+  const handleAutoLogin = async (preUserId: string) => {
+    // 通过 preUserId 获取用户信息并登录
+    const { data: preUser } = await supabase
+      .from('pre_users')
+      .select('used_by')
+      .eq('id', preUserId)
+      .single();
+    
+    if (preUser?.used_by) {
+      // 通过 used_by UUID 查找对应用户
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', preUser.used_by)
+        .single();
+      
+      if (profile) {
+        setUser(profile);
+        await loadUserData(profile.id);
+      }
     }
   };
 
@@ -222,24 +241,6 @@ const App: React.FC = () => {
     if (realm.includes('萌芽')) return 'text-emerald-700 bg-emerald-50 border-emerald-100';
     if (realm.includes('花期')) return 'text-rose-700 bg-rose-50 border-rose-100';
     return 'text-amber-700 bg-amber-50 border-amber-100';
-  };
-
-  // 自动登录（已使用邀请码的用户）
-  const handleAutoLogin = async (nickname: string) => {
-    setIsLoading(true);
-    try {
-      // 使用空密码尝试登录（假设 pre_user 已设置过密码）
-      // 这里需要根据实际业务逻辑调整
-      const result = await signIn(nickname, '');
-      if (result.error) {
-        // 如果自动登录失败，提示用户
-        alert('请使用密码登录');
-        return false;
-      }
-      return true;
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   // 显示等待页面（没有邀请码）

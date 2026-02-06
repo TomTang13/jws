@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { decrypt, isValidUUID } from '../src/crypto';
 import { supabase } from '../src/supabase';
 
 interface LandingPageProps {
-  onLogin: (nickname: string, password: string, isRegister: boolean) => Promise<boolean>;
-  onAutoLogin: (nickname: string) => Promise<boolean>;
+  onLogin: (nickname: string, password: string, preUserId: string) => Promise<boolean>;
+  onAutoLogin: (preUserId: string) => Promise<boolean>;
   isLoading: boolean;
   token?: string;
 }
@@ -20,8 +19,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onAutoLogin, 
   const [validToken, setValidToken] = useState<string | null>(null);
   const [validating, setValidating] = useState(false);
   const [preUserNickname, setPreUserNickname] = useState<string | null>(null);
+  const [preUserId, setPreUserId] = useState<string | null>(null);
 
-  // 验证 token
+  // 验证 token（简单数字）
   useEffect(() => {
     if (token) {
       setValidating(true);
@@ -31,7 +31,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onAutoLogin, 
 
   async function validateToken(t: string) {
     try {
-      // 尝试通过 encrypted_url 匹配
+      // 直接用 token 匹配 encrypted_url
       const { data, error } = await supabase
         .from('pre_users')
         .select('id, nickname, is_used')
@@ -39,49 +39,26 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onAutoLogin, 
         .single();
 
       if (error || !data) {
-        // 尝试通过解密 UUID 匹配
-        const uuid = decrypt(t);
-        if (isValidUUID(uuid)) {
-          const { data: data2 } = await supabase
-            .from('pre_users')
-            .select('id, nickname, is_used')
-            .eq('id', uuid)
-            .single();
-          
-          if (data2) {
-            handlePreUserFound(data2);
-          } else {
-            setLoginError('无效的邀请码');
-            setValidating(false);
-          }
-        } else {
-          setLoginError('邀请码格式无效');
-          setValidating(false);
-        }
+        setLoginError('无效的邀请码');
+        setValidating(false);
         return;
       }
 
-      handlePreUserFound(data);
+      setPreUserId(data.id);
+      setPreUserNickname(data.nickname);
+
+      if (data.is_used) {
+        // 已使用过，直接登录进入主界面
+        setValidating(false);
+        await onAutoLogin(data.id);
+      } else {
+        // 首次使用，带 nickname 进入登录页
+        setName(data.nickname || '');
+        setAct(4);
+        setValidating(false);
+      }
     } catch {
       setLoginError('邀请码验证失败');
-      setValidating(false);
-    }
-  }
-
-  async function handlePreUserFound(data: { id: string; nickname: string | null; is_used: boolean }) {
-    setValidToken(data.id);
-    setPreUserNickname(data.nickname);
-
-    if (data.is_used) {
-      // 已使用过，直接登录进入主界面
-      setValidating(false);
-      if (data.nickname) {
-        await onAutoLogin(data.nickname);
-      }
-    } else {
-      // 首次使用，带 nickname 进入登录页
-      setName(data.nickname || '');
-      setAct(4);
       setValidating(false);
     }
   }
@@ -97,7 +74,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onAutoLogin, 
     }
   }, [isPressing, act]);
 
-  const handleLogin = async (isRegister: boolean) => {
+  const handleLogin = async () => {
     if (!name.trim() || !password.trim()) {
       setLoginError('请输入昵称和密码');
       return;
@@ -108,10 +85,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onAutoLogin, 
       return;
     }
     
+    if (!preUserId) {
+      setLoginError('邀请码无效');
+      return;
+    }
+    
     setLoginError('');
-    const success = await onLogin(name.trim(), password, isRegister);
+    const success = await onLogin(name.trim(), password, preUserId);
     if (!success) {
-      setLoginError(isRegister ? '注册失败' : '登录失败，请检查用户名和密码');
+      setLoginError('登录失败，请检查用户名和密码');
     }
   };
 
@@ -275,7 +257,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onAutoLogin, 
             )}
 
             <motion.button
-              onClick={() => handleLogin(false)}
+              onClick={handleLogin}
               disabled={isLoading}
               className={`w-full py-4 rounded-2xl font-black uppercase tracking-[0.2em] shadow-xl transition-all flex items-center justify-center gap-2 ${
                 isLoading ? 'bg-slate-100 text-slate-300' : 'bg-slate-900 text-white active:translate-y-1'
@@ -284,21 +266,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onAutoLogin, 
               {isLoading ? '...' : '登录'}
             </motion.button>
 
-            <motion.button
-              onClick={() => handleLogin(true)}
-              disabled={isLoading}
-              className={`w-full py-3 rounded-xl font-bold uppercase tracking-[0.2em] transition-all ${
-                isLoading ? 'text-slate-300' : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              新访客？点此注册
-            </motion.button>
+            <p className="text-center text-[9px] font-black text-slate-300 uppercase tracking-widest">
+              推开工坊的门 开启结缘
+            </p>
           </div>
         )}
-
-        <p className="text-center text-[9px] font-black text-slate-300 uppercase tracking-widest">
-          推开工坊的门 开启结缘
-        </p>
       </motion.div>
     </div>
   );
