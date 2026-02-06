@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { decrypt, isValidUUID } from '../crypto';
-import { supabase } from '../supabase';
+import { decrypt, isValidUUID } from '../src/crypto';
+import { supabase } from '../src/supabase';
 
 interface LandingPageProps {
   onLogin: (nickname: string, password: string, isRegister: boolean) => Promise<boolean>;

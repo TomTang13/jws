@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { LevelConfig, Quest, ShopItem, Realm } from '../types';
+import { LevelConfig, Quest, ShopItem, Realm } from './types';
 
 export interface DatabaseLevel {
   level: number;

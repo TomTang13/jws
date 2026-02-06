@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { LEVELS, QUESTS, SKILL_PATHS, GUILD_SHOP } from './constants';
 import { PlayerStats, Realm, Quest } from './types';
-import { QuestCard } from './components/QuestCard';
-import { LandingPage } from './components/LandingPage';
-import { QRModal } from './components/QRModal';
-import { ScannerOverlay } from './components/ScannerOverlay';
+import { QuestCard } from '../components/QuestCard';
+import { LandingPage } from '../components/LandingPage';
+import { QRModal } from '../components/QRModal';
+import { ScannerOverlay } from '../components/ScannerOverlay';
 import { motion, AnimatePresence } from 'framer-motion';
-import { supabase, testConnection } from './src/supabase';
-import { signUp, signIn, signOut, onAuthChange, getCurrentUser, updateProfile, type UserProfile } from './src/auth';
-import { getLevels, getQuests, getShopItems, getUserCompletedQuests, getUserInventory, addQuestRecord, addRedemptionRecord } from './src/dataService';
+import { supabase, testConnection } from './supabase';
+import { signUp, signIn, signOut, onAuthChange, getCurrentUser, updateProfile, type UserProfile } from './auth';
+import { getLevels, getQuests, getShopItems, getUserCompletedQuests, getUserInventory, addQuestRecord, addRedemptionRecord } from './dataService';
 
 const App: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
