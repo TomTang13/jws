@@ -224,6 +224,24 @@ const App: React.FC = () => {
     return 'text-amber-700 bg-amber-50 border-amber-100';
   };
 
+  // 自动登录（已使用邀请码的用户）
+  const handleAutoLogin = async (nickname: string) => {
+    setIsLoading(true);
+    try {
+      // 使用空密码尝试登录（假设 pre_user 已设置过密码）
+      // 这里需要根据实际业务逻辑调整
+      const result = await signIn(nickname, '');
+      if (result.error) {
+        // 如果自动登录失败，提示用户
+        alert('请使用密码登录');
+        return false;
+      }
+      return true;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // 显示等待页面（没有邀请码）
   if (!isLoading && !user && !inviteToken) {
     return (
@@ -243,6 +261,7 @@ const App: React.FC = () => {
     return (
       <LandingPage 
         onLogin={handleLogin}
+        onAutoLogin={handleAutoLogin}
         isLoading={isLoading}
         token={inviteToken || undefined}
       />

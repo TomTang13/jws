@@ -5,11 +5,12 @@ import { supabase } from '../src/supabase';
 
 interface LandingPageProps {
   onLogin: (nickname: string, password: string, isRegister: boolean) => Promise<boolean>;
+  onAutoLogin: (nickname: string) => Promise<boolean>;
   isLoading: boolean;
   token?: string;
 }
 
-export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, isLoading, token }) => {
+export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onAutoLogin, isLoading, token }) => {
   const [act, setAct] = useState<number>(1);
   const [isPressing, setIsPressing] = useState(false);
   const [name, setName] = useState('');
@@ -18,6 +19,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, isLoading, to
   const [loginError, setLoginError] = useState('');
   const [validToken, setValidToken] = useState<string | null>(null);
   const [validating, setValidating] = useState(false);
+  const [preUserNickname, setPreUserNickname] = useState<string | null>(null);
 
   // 验证 token
   useEffect(() => {
@@ -29,49 +31,57 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, isLoading, to
 
   async function validateToken(t: string) {
     try {
-      const uuid = decrypt(t);
-      
-      // 方式1：直接用 token 解密出 UUID 验证
-      if (isValidUUID(uuid)) {
-        const { data } = await supabase
-          .from('pre_users')
-          .select('id, nickname, encrypted_url')
-          .eq('id', uuid)
-          .single();
-        
-        if (data) {
-          setValidToken(data.id);
-          setName(data.nickname || '');
-          setAct(4);
-          return;
-        }
-      }
-      
-      // 方式2：通过 encrypted_url 匹配（用户点击链接时）
-      if (t) {
-        const { data } = await supabase
-          .from('pre_users')
-          .select('id, nickname, encrypted_url, is_used')
-          .eq('encrypted_url', t)
-          .single();
-        
-        if (data) {
-          if (data.is_used) {
-            setLoginError('此邀请码已被使用');
+      // 尝试通过 encrypted_url 匹配
+      const { data, error } = await supabase
+        .from('pre_users')
+        .select('id, nickname, is_used')
+        .eq('encrypted_url', t)
+        .single();
+
+      if (error || !data) {
+        // 尝试通过解密 UUID 匹配
+        const uuid = decrypt(t);
+        if (isValidUUID(uuid)) {
+          const { data: data2 } = await supabase
+            .from('pre_users')
+            .select('id, nickname, is_used')
+            .eq('id', uuid)
+            .single();
+          
+          if (data2) {
+            handlePreUserFound(data2);
           } else {
-            setValidToken(data.id);
-            setName(data.nickname || '');
-            setAct(4);
+            setLoginError('无效的邀请码');
+            setValidating(false);
           }
         } else {
-          setLoginError('无效的邀请码');
+          setLoginError('邀请码格式无效');
+          setValidating(false);
         }
-      } else {
-        setLoginError('邀请码格式无效');
+        return;
       }
+
+      handlePreUserFound(data);
     } catch {
       setLoginError('邀请码验证失败');
-    } finally {
+      setValidating(false);
+    }
+  }
+
+  async function handlePreUserFound(data: { id: string; nickname: string | null; is_used: boolean }) {
+    setValidToken(data.id);
+    setPreUserNickname(data.nickname);
+
+    if (data.is_used) {
+      // 已使用过，直接登录进入主界面
+      setValidating(false);
+      if (data.nickname) {
+        await onAutoLogin(data.nickname);
+      }
+    } else {
+      // 首次使用，带 nickname 进入登录页
+      setName(data.nickname || '');
+      setAct(4);
       setValidating(false);
     }
   }
@@ -209,8 +219,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, isLoading, to
         className="w-full max-w-xs space-y-8"
       >
         <div className="space-y-2 text-center">
-           <p className="font-serif text-lg italic text-slate-700">在这本《织梦手记》里，</p>
-           <p className="font-serif text-lg italic text-slate-700">我们该如何称呼你？</p>
+           <p className="font-serif text-lg italic text-slate-700">
+             {validToken ? '有缘人，请落款' : '在这本《织梦手记》里，'}
+           </p>
+           {preUserNickname && (
+             <p className="font-serif text-lg italic text-rose-500">
+               我们该如何称呼你，{preUserNickname}？
+             </p>
+           )}
         </div>
 
         {validating ? (
@@ -254,8 +270,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, isLoading, to
               <p className="text-xs text-red-500 text-center">{loginError}</p>
             )}
 
-            {validToken && (
-              <p className="text-xs text-green-600 text-center">✓ 邀请码验证成功</p>
+            {validToken && preUserNickname && (
+              <p className="text-xs text-green-600 text-center">✓ 欢迎回来，{preUserNickname}</p>
             )}
 
             <motion.button
