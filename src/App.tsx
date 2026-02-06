@@ -3,6 +3,7 @@ import { LEVELS, QUESTS, SKILL_PATHS, GUILD_SHOP } from './constants';
 import { PlayerStats, Realm, Quest } from './types';
 import { QuestCard } from '../components/QuestCard';
 import { LandingPage } from '../components/LandingPage';
+import { WaitingPage } from '../components/WaitingPage';
 import { QRModal } from '../components/QRModal';
 import { ScannerOverlay } from '../components/ScannerOverlay';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -223,7 +224,21 @@ const App: React.FC = () => {
     return 'text-amber-700 bg-amber-50 border-amber-100';
   };
 
-  // 显示登录页面（未登录）
+  // 显示等待页面（没有邀请码）
+  if (!isLoading && !user && !inviteToken) {
+    return (
+      <WaitingPage 
+        onRefresh={() => {
+          const token = sessionStorage.getItem('jws_invite_token');
+          if (token) {
+            setInviteToken(token);
+          }
+        }}
+      />
+    );
+  }
+
+  // 显示登录页面（未登录但有邀请码）
   if (!isLoading && !user) {
     return (
       <LandingPage 
