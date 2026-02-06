@@ -1,0 +1,8 @@
+
+{
+  "name": "经纬司 · 织梦手记",
+  "description": "一个结合编织工艺与仙侠修真体系的工会养成系统。从外门弟子到一代宗师，体验经纬司的匠心传承与商业版图扩张。",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
