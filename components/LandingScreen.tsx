@@ -1,48 +1,52 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface LandingScreenProps {
-  onComplete: (name: string) => void;
+  onLogin: (nickname: string, password: string, isRegister: boolean) => Promise<boolean>;
+  isLoading: boolean;
 }
 
-export const LandingScreen: React.FC<LandingScreenProps> = ({ onComplete }) => {
+export const LandingScreen: React.FC<LandingScreenProps> = ({ onLogin, isLoading }) => {
   const [act, setAct] = useState<number>(1);
   const [isPressing, setIsPressing] = useState(false);
-  const [progress, setProgress] = useState(0);
   const [name, setName] = useState('');
-  const pressTimer = useRef<number | null>(null);
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [loginError, setLoginError] = useState('');
 
+  // 长按动画
   useEffect(() => {
-    if (isPressing) {
-      const start = Date.now();
-      const duration = 2000; // 2 seconds to complete Act 2
-      const interval = setInterval(() => {
-        const elapsed = Date.now() - start;
-        const currentProgress = Math.min(elapsed / duration, 1);
-        setProgress(currentProgress);
-        if (currentProgress >= 1) {
-          clearInterval(interval);
-          setAct(3);
-        }
-      }, 50);
-      return () => clearInterval(interval);
-    } else {
-      setProgress(0);
+    if (isPressing && act === 1) {
+      const timeout = setTimeout(() => {
+        setAct(3);
+        setIsPressing(false);
+      }, 2000);
+      return () => clearTimeout(timeout);
     }
-  }, [isPressing]);
+  }, [isPressing, act]);
 
-  const handleStartPress = () => {
-    if (act === 1) setIsPressing(true);
-  };
-
-  const handleEndPress = () => {
-    if (act === 1) setIsPressing(false);
+  const handleLogin = async (isRegister: boolean) => {
+    if (!name.trim() || !password.trim()) {
+      setLoginError('请输入昵称和密码');
+      return;
+    }
+    
+    if (password.length < 4) {
+      setLoginError('密码至少4位');
+      return;
+    }
+    
+    setLoginError('');
+    const success = await onLogin(name.trim(), password, isRegister);
+    if (!success) {
+      setLoginError(isRegister ? '注册失败，可能用户名已存在' : '登录失败，请检查用户名和密码');
+    }
   };
 
   return (
     <div className="fixed inset-0 z-[100] bg-[#fdfbf7] flex flex-col items-center justify-center p-8 overflow-hidden paper-texture">
       <AnimatePresence mode="wait">
+        {/* 阶段1：开场 */}
         {act === 1 && (
           <motion.div 
             key="act1"
@@ -100,13 +104,13 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onComplete }) => {
               transition={{ delay: 5 }}
               className="pt-24 flex flex-col items-center"
             >
-              {/* Interaction Container - Fixed centering */}
               <div 
                 className="relative w-20 h-20 flex items-center justify-center cursor-pointer select-none"
-                onMouseDown={handleStartPress}
-                onMouseUp={handleEndPress}
-                onTouchStart={handleStartPress}
-                onTouchEnd={handleEndPress}
+                onMouseDown={() => isLoading || setIsPressing(true)}
+                onMouseUp={() => setIsPressing(false)}
+                onMouseLeave={() => setIsPressing(false)}
+                onTouchStart={() => isLoading || setIsPressing(true)}
+                onTouchEnd={() => setIsPressing(false)}
               >
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                    <motion.div 
@@ -124,16 +128,23 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onComplete }) => {
                 
                 {isPressing && (
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="ripple-effect w-16 h-16" />
+                    <motion.div 
+                      animate={{ scale: [1, 1.5], opacity: [0.5, 0] }}
+                      transition={{ repeat: Infinity, duration: 1 }}
+                      className="w-16 h-16 rounded-full border-2 border-[#e1a6ad]"
+                    />
                   </div>
                 )}
               </div>
 
-              <p className="mt-8 text-[10px] font-bold text-[#e1a6ad] tracking-[0.2em] uppercase">长按 开启结界</p>
+              <p className="mt-8 text-[10px] font-bold text-[#e1a6ad] tracking-[0.2em] uppercase">
+                {isLoading ? '连接中...' : '长按 开启结界'}
+              </p>
             </motion.div>
           </motion.div>
         )}
 
+        {/* 阶段3：开场动画 */}
         {act === 3 && (
           <motion.div 
             key="act3"
@@ -185,39 +196,77 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onComplete }) => {
           </motion.div>
         )}
 
+        {/* 阶段4：登录/注册 */}
         {act === 4 && (
           <motion.div 
             key="act4"
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
-            className="w-full max-w-xs space-y-12"
+            className="w-full max-w-xs space-y-8"
           >
              <div className="space-y-2 text-center">
                 <p className="font-serif text-lg italic text-slate-700">在这本《织梦手记》里，</p>
                 <p className="font-serif text-lg italic text-slate-700">我们该如何称呼你？</p>
              </div>
 
-             <div className="relative">
-                <input 
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="请输入你的工坊代号"
-                  className="w-full bg-transparent border-b-2 border-slate-200 py-4 text-center text-xl focus:outline-none focus:border-[#e1a6ad] transition-colors font-serif italic"
-                />
-                <div className="absolute bottom-0 left-0 w-full h-0.5 bg-gradient-to-r from-transparent via-[#e1a6ad] to-transparent transform scale-x-0 transition-transform duration-500 peer-focus:scale-x-100"></div>
-             </div>
+             {/* 登录表单 */}
+             <div className="space-y-4">
+                <div className="relative">
+                  <input 
+                    type="text"
+                    value={name}
+                    onChange={(e) => { setName(e.target.value); setLoginError(''); }}
+                    placeholder="工坊代号（昵称）"
+                    disabled={isLoading}
+                    className="w-full bg-transparent border-b-2 border-slate-200 py-4 pl-2 pr-10 text-center text-lg focus:outline-none focus:border-[#e1a6ad] transition-colors font-serif italic"
+                  />
+                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xl">👤</span>
+                </div>
 
-             <button
-              onClick={() => name.trim() && onComplete(name.trim())}
-              disabled={!name.trim()}
-              className={`w-full py-5 rounded-2xl font-black uppercase tracking-[0.3em] shadow-2xl transition-all flex items-center justify-center gap-3 ${
-                name.trim() ? 'bg-slate-900 text-white active:translate-y-1' : 'bg-slate-100 text-slate-300 grayscale cursor-not-allowed'
-              }`}
-             >
-               <span className="text-lg">🪡</span>
-               开始修行
-             </button>
+                <div className="relative">
+                  <input 
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => { setPassword(e.target.value); setLoginError(''); }}
+                    placeholder="密码"
+                    disabled={isLoading}
+                    className="w-full bg-transparent border-b-2 border-slate-200 py-4 pl-2 pr-20 text-center text-lg focus:outline-none focus:border-[#e1a6ad] transition-colors font-serif italic"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-lg"
+                  >
+                    {showPassword ? '👁️' : '🔒'}
+                  </button>
+                </div>
+
+                {loginError && (
+                  <p className="text-xs text-red-500 text-center">{loginError}</p>
+                )}
+
+                {/* 登录按钮 */}
+                <motion.button
+                  onClick={() => handleLogin(false)}
+                  disabled={isLoading}
+                  className={`w-full py-4 rounded-2xl font-black uppercase tracking-[0.2em] shadow-xl transition-all flex items-center justify-center gap-2 ${
+                    isLoading ? 'bg-slate-100 text-slate-300' : 'bg-slate-900 text-white active:translate-y-1'
+                  }`}
+                >
+                  {isLoading ? '...' : '登录'}
+                </motion.button>
+
+                {/* 注册按钮 */}
+                <motion.button
+                  onClick={() => handleLogin(true)}
+                  disabled={isLoading}
+                  className={`w-full py-3 rounded-xl font-bold uppercase tracking-[0.2em] transition-all ${
+                    isLoading ? 'text-slate-300' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  新访客？点此注册
+                </motion.button>
+             </div>
 
              <p className="text-center text-[9px] font-black text-slate-300 uppercase tracking-widest">
                推开工坊的门 开启结缘
@@ -225,21 +274,6 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onComplete }) => {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Dynamic Background Yarn */}
-      {isPressing && (
-        <svg className="absolute inset-0 pointer-events-none opacity-20">
-          <motion.path
-            d={`M ${Math.random()*400} 0 Q ${Math.random()*400} ${Math.random()*800} ${Math.random()*400} 1000`}
-            fill="none"
-            stroke="#e1a6ad"
-            strokeWidth="2"
-            initial={{ pathLength: 0 }}
-            animate={{ pathLength: 1 }}
-            transition={{ duration: 2 }}
-          />
-        </svg>
-      )}
     </div>
   );
 };
