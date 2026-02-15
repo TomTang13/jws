@@ -3,8 +3,8 @@ import { motion } from 'framer-motion';
 import { supabase } from '../src/supabase';
 
 interface LandingPageProps {
-  onLogin: (nickname: string, password: string, preUserId: string) => Promise<boolean>;
-  onAutoLogin: (preUserId: string) => Promise<boolean>;
+  onLogin: (nickname: string, preUserId: string) => Promise<boolean>;
+  onAutoLogin: (preUserId: string, token: string) => Promise<{ ok: boolean; error?: string }>;
   isLoading: boolean;
   token?: string;
 }
@@ -13,15 +13,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onAutoLogin, 
   const [act, setAct] = useState<number>(1);
   const [isPressing, setIsPressing] = useState(false);
   const [name, setName] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [loginError, setLoginError] = useState('');
   const [validToken, setValidToken] = useState<string | null>(null);
   const [validating, setValidating] = useState(false);
+  const [autoLoggingIn, setAutoLoggingIn] = useState(false);
   const [preUserNickname, setPreUserNickname] = useState<string | null>(null);
   const [preUserId, setPreUserId] = useState<string | null>(null);
 
-  // 验证 token（简单数字）
+  // 验证 token（t 为实物密钥，对应 pre_users.encrypted_string）
   useEffect(() => {
     if (token) {
       setValidating(true);
@@ -29,36 +28,71 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onAutoLogin, 
     }
   }, [token]);
 
+  // 已使用密钥：验证通过后自动登录（仅凭 t 即可进入，无需密码）
+  useEffect(() => {
+    if (!autoLoggingIn || !preUserId) return;
+    const rawToken = validToken ?? token ?? '';
+    let cancelled = false;
+    onAutoLogin(preUserId, rawToken).then((res) => {
+      if (cancelled) return;
+      setAutoLoggingIn(false);
+      if (!res.ok) {
+        setLoginError(res.error || '自动登录失败，请重试。');
+      }
+    });
+    return () => { cancelled = true; };
+  }, [autoLoggingIn, preUserId, validToken, token]);
+
   async function validateToken(t: string) {
+    console.log('[validateToken] 开始验证邀请码:', t);
     try {
-      // 直接用 token 匹配 encrypted_url
+      const trimmed = (t || '').trim();
+      if (!trimmed) {
+        console.log('[validateToken] 邀请码为空');
+        setLoginError('邀请码不能为空');
+        setValidating(false);
+        return;
+      }
+      console.log('[validateToken] 查询 pre_users 表，encrypted_string:', trimmed);
       const { data, error } = await supabase
         .from('pre_users')
-        .select('id, nickname, is_used')
-        .eq('encrypted_url', t)
-        .single();
+        .select('id, nickname, is_used, used_by')
+        .eq('encrypted_string', trimmed)
+        .maybeSingle();
 
-      if (error || !data) {
-        setLoginError('无效的邀请码');
+      console.log('[validateToken] 查询结果:', { data, error });
+      if (error) {
+        console.error('[validateToken] 查询失败', error);
+        setLoginError(`验证失败: ${error.message}`);
+        setValidating(false);
+        return;
+      }
+      if (!data) {
+        console.error('[validateToken] 未找到邀请码记录:', trimmed);
+        setLoginError('无效的邀请码（请确认该密钥已在后台 pre_users 表中录入）');
         setValidating(false);
         return;
       }
 
+      console.log('[validateToken] 邀请码验证成功:', data);
       setPreUserId(data.id);
-      setPreUserNickname(data.nickname);
+      setValidToken(t);
+      setValidating(false);
 
       if (data.is_used) {
-        // 已使用过，直接登录进入主界面
-        setValidating(false);
-        await onAutoLogin(data.id);
+        console.log('[validateToken] 邀请码已使用，开始自动登录:', data.id);
+        // 已使用：进入「正在进入工坊…」并触发自动登录，不显示新手引导
+        setAutoLoggingIn(true);
       } else {
-        // 首次使用，带 nickname 进入登录页
+        console.log('[validateToken] 邀请码首次使用，进入新手引导:', data.id);
+        // 首次使用：进入新手引导，落款时只填昵称，建 profile、改 is_used 并登录
+        setPreUserNickname(data.nickname || null);
         setName(data.nickname || '');
-        setAct(4);
-        setValidating(false);
+        setAct(1);
       }
-    } catch {
-      setLoginError('邀请码验证失败');
+    } catch (e: any) {
+      console.error('[validateToken] 验证异常:', e);
+      setLoginError(`邀请码验证失败: ${e.message}`);
       setValidating(false);
     }
   }
@@ -74,28 +108,31 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onAutoLogin, 
     }
   }, [isPressing, act]);
 
-  const handleLogin = async () => {
-    if (!name.trim() || !password.trim()) {
-      setLoginError('请输入昵称和密码');
+  const handleSubmit = async () => {
+    if (!name.trim()) {
+      setLoginError('请输入工坊代号（昵称）');
       return;
     }
-    
-    if (password.length < 4) {
-      setLoginError('密码至少4位');
-      return;
-    }
-    
     if (!preUserId) {
       setLoginError('邀请码无效');
       return;
     }
-    
     setLoginError('');
-    const success = await onLogin(name.trim(), password, preUserId);
-    if (!success) {
-      setLoginError('登录失败，请检查用户名和密码');
-    }
+    const success = await onLogin(name.trim(), preUserId);
+    if (!success) setLoginError('落款失败，请重试');
   };
+
+  // 已使用密钥：只显示「正在进入工坊…」，凭密钥即可进入，无需密码
+  if (autoLoggingIn) {
+    return (
+      <div className="fixed inset-0 z-[100] bg-[#fdfbf7] flex flex-col items-center justify-center p-8 overflow-hidden paper-texture">
+        <div className="text-6xl mb-8 opacity-80">🧶</div>
+        <p className="text-sm text-slate-500 font-serif">正在进入工坊...</p>
+        <p className="text-[10px] text-slate-400 mt-2 font-serif">凭密钥即可进入，无需密码</p>
+        {loginError && <p className="mt-4 text-xs text-red-500 text-center max-w-xs">{loginError}</p>}
+      </div>
+    );
+  }
 
   // 阶段1：开场
   if (act === 1) {
@@ -153,6 +190,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onAutoLogin, 
           <p className="mt-8 text-[10px] font-bold text-[#e1a6ad] tracking-[0.2em] uppercase">
             {isLoading ? '连接中...' : '长按 开启结界'}
           </p>
+          {loginError && (
+            <p className="mt-6 text-xs text-red-500 text-center max-w-xs px-4">{loginError}</p>
+          )}
         </motion.div>
       </div>
     );
@@ -230,40 +270,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onAutoLogin, 
               <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xl">👤</span>
             </div>
 
-            <div className="relative">
-              <input 
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => { setPassword(e.target.value); setLoginError(''); }}
-                placeholder="密码"
-                disabled={isLoading}
-                className="w-full bg-transparent border-b-2 border-slate-200 py-4 pl-2 pr-20 text-center text-lg focus:outline-none focus:border-[#e1a6ad] transition-colors font-serif italic"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-lg"
-              >
-                {showPassword ? '👁️' : '🔒'}
-              </button>
-            </div>
-
             {loginError && (
               <p className="text-xs text-red-500 text-center">{loginError}</p>
             )}
 
-            {validToken && preUserNickname && (
-              <p className="text-xs text-green-600 text-center">✓ 欢迎回来，{preUserNickname}</p>
-            )}
-
             <motion.button
-              onClick={handleLogin}
+              onClick={handleSubmit}
               disabled={isLoading}
               className={`w-full py-4 rounded-2xl font-black uppercase tracking-[0.2em] shadow-xl transition-all flex items-center justify-center gap-2 ${
                 isLoading ? 'bg-slate-100 text-slate-300' : 'bg-slate-900 text-white active:translate-y-1'
               }`}
             >
-              {isLoading ? '...' : '登录'}
+              {isLoading ? '...' : '落款并登录'}
             </motion.button>
 
             <p className="text-center text-[9px] font-black text-slate-300 uppercase tracking-widest">

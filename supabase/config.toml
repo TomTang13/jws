@@ -1,0 +1,5 @@
+# Supabase 本地/部署配置（仅保留与 Edge Functions 相关部分）
+# 完整配置可用 supabase init 生成
+
+[functions.sync-key-password]
+verify_jwt = false

@@ -8,7 +8,7 @@ import { QRModal } from '../components/QRModal';
 import { ScannerOverlay } from '../components/ScannerOverlay';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase, testConnection } from './supabase';
-import { signUp, signIn, signOut, onAuthChange, getCurrentUser, updateProfile, type UserProfile } from './auth';
+import { signUp, signIn, signInWithPasswordOnly, signOut, syncKeyPassword, onAuthChange, getCurrentUser, updateProfile, getTokenBasedPassword, type UserProfile } from './auth';
 import { getLevels, getQuests, getShopItems, getUserCompletedQuests, getUserInventory, addQuestRecord, addRedemptionRecord } from './dataService';
 
 const App: React.FC = () => {
@@ -89,50 +89,119 @@ const App: React.FC = () => {
     setUserInventory(inventory);
   }
 
-  // 登录/注册处理（带 preUserId）
-  const handleLogin = async (nickname: string, password: string, preUserId: string) => {
+  // 首次使用密钥 t：仅填昵称，用密钥派生密码注册并登录
+  const handleLogin = async (nickname: string, preUserId: string) => {
     setIsLoading(true);
-    
     try {
-      // 注册并关联 pre_users
+      const password = getTokenBasedPassword(preUserId);
       const result = await signUp(nickname, password, preUserId);
-      
       if (result.error) {
         alert(result.error.message);
         return false;
       }
-      
-      // 清除邀请码
       sessionStorage.removeItem('jws_invite_token');
       setInviteToken(null);
-      
       return true;
     } finally {
       setIsLoading(false);
     }
   };
 
-  // 自动登录（已使用邀请码的用户）
-  const handleAutoLogin = async (preUserId: string) => {
-    // 通过 preUserId 获取用户信息并登录
-    const { data: preUser } = await supabase
-      .from('pre_users')
-      .select('used_by')
-      .eq('id', preUserId)
-      .single();
-    
-    if (preUser?.used_by) {
-      // 通过 used_by UUID 查找对应用户
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', preUser.used_by)
+  // 已使用过密钥 t：仅凭 t 即可登录（服务端同步派生密码后直接登入，用户无需输入密码）。
+  const handleAutoLogin = async (preUserId: string, rawToken: string): Promise<{ ok: boolean; error?: string }> => {
+    console.log('[handleAutoLogin] 开始自动登录流程:', { preUserId, rawToken });
+    try {
+      // 检查 pre_users 表中是否有对应的记录
+      console.log('[handleAutoLogin] 查询 pre_users 表...');
+      const { data: preRow, error: preRowError } = await supabase
+        .from('pre_users')
+        .select('used_by')
+        .eq('id', preUserId)
         .single();
       
-      if (profile) {
-        setUser(profile);
-        await loadUserData(profile.id);
+      console.log('[handleAutoLogin] pre_users 查询结果:', { preRow, preRowError });
+      
+      if (preRowError) {
+        console.error('[handleAutoLogin] pre_users 查询失败:', preRowError);
+        return { ok: false, error: `pre_users 查询失败: ${preRowError.message}` };
       }
+      
+      if (!preRow?.used_by) {
+        console.error('[handleAutoLogin] used_by 未填写:', preRow);
+        return { ok: false, error: 'pre_users.used_by 未填写。请把该密钥对应的用户 id（profiles 表的 id）填入该行的 used_by 列。' };
+      }
+      
+      // 检查 profiles 表中是否有对应的用户
+      console.log('[handleAutoLogin] 查询 profiles 表...');
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', preRow.used_by)
+        .single();
+      
+      console.log('[handleAutoLogin] profiles 查询结果:', { profile, profileError });
+      
+      if (profileError) {
+        console.error('[handleAutoLogin] profiles 查询失败:', profileError);
+        return { ok: false, error: `profiles 查询失败: ${profileError.message}` };
+      }
+      
+      if (!profile) {
+        console.error('[handleAutoLogin] 未找到关联账号:', preRow.used_by);
+        return { ok: false, error: '未找到关联账号：profiles 中不存在 id = ' + preRow.used_by + '，请检查 used_by 是否填错。' };
+      }
+      
+      // 先让服务端把该用户的 Auth 邮箱+密码同步，再登录，保证仅凭 t 即可进入
+      console.log('[handleAutoLogin] 开始密钥同步...');
+      const syncRes = await syncKeyPassword(preUserId, rawToken);
+      console.log('[handleAutoLogin] 密钥同步结果:', syncRes);
+      
+      if (!syncRes.ok) {
+        console.error('[handleAutoLogin] 密钥同步失败:', syncRes.error);
+        // 生成详细的错误信息，包含所有可能的调试信息
+        const detailedError = `
+密钥同步失败详情：
+- Edge Function 错误: ${syncRes.error || '未知错误'}
+- 密钥: ${rawToken}
+- 预注册用户ID: ${preUserId}
+- 请检查：
+  1. Edge Function 是否已部署
+  2. 环境变量是否正确配置
+  3. pre_users 表中是否存在该密钥
+  4. 数据库权限是否正确
+`;
+        console.error('[handleAutoLogin] 详细错误信息:', detailedError);
+        return { ok: false, error: detailedError };
+      }
+      
+      // 同步成功后，使用派生密码登录
+      console.log('[handleAutoLogin] 密钥同步成功，开始登录...');
+      const password = getTokenBasedPassword(preUserId);
+      console.log('[handleAutoLogin] 登录参数:', { nickname: profile.nickname, password });
+      
+      const result = await signInWithPasswordOnly(profile.nickname, password);
+      console.log('[handleAutoLogin] 登录结果:', result);
+      
+      if (result.error) {
+        console.error('[handleAutoLogin] 登录失败:', result.error);
+        return {
+          ok: false,
+          error: '凭密钥即可进入；若仍失败请部署 Edge Function sync-key-password 后重试。' +
+            (result.error.message ? ' 详情：' + result.error.message : ''),
+        };
+      }
+      
+      // 登录成功
+      console.log('[handleAutoLogin] 登录成功，加载用户数据...');
+      sessionStorage.removeItem('jws_invite_token');
+      setInviteToken(null);
+      setUser(profile);
+      await loadUserData(profile.id);
+      console.log('[handleAutoLogin] 自动登录流程完成');
+      return { ok: true };
+    } catch (e: any) {
+      console.error('[handleAutoLogin] 自动登录异常:', { message: e.message, stack: e.stack });
+      return { ok: false, error: `自动登录异常: ${e.message}` };
     }
   };
 

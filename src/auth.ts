@@ -14,28 +14,31 @@ export interface UserProfile {
   created_at: string;
 }
 
+// 昵称登录用占位邮箱（Supabase 校验格式）
+const placeholderEmail = (nickname: string) => `${encodeURIComponent(nickname)}@users.jws.alincraft.com`;
+
+// 仅借用邮箱登录机制，不真正发邮件；Supabase 若开启「确认邮件」会报发信错误，此处视为可忽略
+const isConfirmationEmailError = (msg: string) =>
+  /confirmation\s*email|sending.*email|send.*email/i.test(msg);
+
 // 注册
 export async function signUp(nickname: string, password: string, preUserId?: string) {
   const { data, error } = await supabase.auth.signUp({
-    email: `${nickname}@temp.local`,
+    email: placeholderEmail(nickname),
     password: password,
     options: {
       data: { nickname }
     }
   });
-  
-  if (error) return { error };
-  
-  // 创建用户档案
-  if (data.user) {
-    // 如果是预注册用户，标记为已使用
+
+  // 若是「发送确认邮件」类错误但用户已创建：仍完成建档并尝试直接登录（不依赖邮件）
+  if (error && data?.user && isConfirmationEmailError(error.message)) {
     if (preUserId) {
       await supabase.from('pre_users').update({
         is_used: true,
         used_by: data.user.id
       }).eq('id', preUserId);
     }
-    
     const { error: profileError } = await supabase.from('profiles').insert({
       id: data.user.id,
       nickname: nickname,
@@ -46,35 +49,99 @@ export async function signUp(nickname: string, password: string, preUserId?: str
       play_style: 'Hybrid',
       inventory: []
     });
-    
-    if (profileError) {
-      console.error('创建档案失败:', profileError);
-    }
+    if (profileError) console.error('创建档案失败:', profileError);
+    const signInResult = await signInWithPasswordOnly(nickname, password);
+    if (!signInResult.error) return { data: signInResult.data };
+    // 若项目强制邮件确认，登录会失败，提示在控制台关闭「确认邮件」
+    return {
+      error: {
+        message:
+          '注册已完成。请在 Supabase 控制台关闭「确认邮件」（Authentication → Providers → Email）后刷新页面重新登录。'
+      }
+    };
   }
-  
+
+  if (error) return { error };
+
+  // 创建用户档案
+  if (data.user) {
+    if (preUserId) {
+      await supabase.from('pre_users').update({
+        is_used: true,
+        used_by: data.user.id
+      }).eq('id', preUserId);
+    }
+    const { error: profileError } = await supabase.from('profiles').insert({
+      id: data.user.id,
+      nickname: nickname,
+      level: 1,
+      coins: 2000,
+      yc: 0,
+      inspiration: 0,
+      play_style: 'Hybrid',
+      inventory: []
+    });
+    if (profileError) console.error('创建档案失败:', profileError);
+  }
+
   return { data, error };
 }
 
-// 登录
+/** 实物密钥 t 对应的账号使用统一派生密码，不向用户展示 */
+export function getTokenBasedPassword(preUserId: string): string {
+  return `jws:${preUserId}`;
+}
+
+/** 服务端将密钥对应用户的 Auth 密码同步为派生密码，保证「仅凭 t 即可登录」。需部署 Edge Function sync-key-password。 */
+export async function syncKeyPassword(preUserId: string, token: string): Promise<{ ok: boolean; error?: string }> {
+  const trimmedToken = (token || '').trim();
+  console.log('[syncKeyPassword] 调用参数:', { preUserId, token: trimmedToken });
+  try {
+    const { data, error } = await supabase.functions.invoke('sync-key-password', {
+      body: { preUserId, token: trimmedToken },
+    });
+    console.log('[syncKeyPassword] 调用结果:', { data, error });
+    if (error) {
+      console.error('[syncKeyPassword] Edge Function 错误:', { 
+        message: error.message, 
+        status: error.status, 
+        details: error.details 
+      });
+      return { ok: false, error: `Edge Function 错误: ${error.message} (状态码: ${error.status})` };
+    }
+    if (data?.error) {
+      console.error('[syncKeyPassword] 服务端返回错误:', data.error);
+      return { ok: false, error: String(data.error) };
+    }
+    console.log('[syncKeyPassword] 密钥同步成功');
+    return { ok: true };
+  } catch (e: any) {
+    console.error('[syncKeyPassword] 调用异常:', { message: e.message, stack: e.stack });
+    return { ok: false, error: `调用异常: ${e.message}` };
+  }
+}
+
+// 仅用昵称+密码调 Auth，不查 profiles（用于自动登录等已确知昵称的场景，避免未登录时 RLS 导致「用户不存在」）
+export async function signInWithPasswordOnly(nickname: string, password: string) {
+  return await supabase.auth.signInWithPassword({
+    email: placeholderEmail(nickname),
+    password: password
+  });
+}
+
+// 登录（会先按昵称查 profiles，未登录时若 RLS 禁止匿名读会报「用户不存在」）
 export async function signIn(nickname: string, password: string) {
-  // 查找用户邮箱
   const { data: userData, error: findError } = await supabase
     .from('profiles')
     .select('id, nickname')
     .eq('nickname', nickname)
     .single();
-  
+
   if (findError || !userData) {
     return { error: { message: '用户不存在' } };
   }
-  
-  // 使用邮箱登录
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: `${nickname}@temp.local`,
-    password: password
-  });
-  
-  return { data, error };
+
+  return await signInWithPasswordOnly(nickname, password);
 }
 
 // 退出
