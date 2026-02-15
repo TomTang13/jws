@@ -1,121 +1,286 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { LEVELS, QUESTS, SKILL_PATHS, GUILD_SHOP } from './constants';
-import { PlayerStats, Realm, SkillPathId, Quest } from './types';
-import { QuestCard } from './components/QuestCard';
-import { LandingScreen } from './components/LandingScreen';
-import { QRModal } from './components/QRModal';
-import { ScannerOverlay } from './components/ScannerOverlay';
+import { PlayerStats, Realm, Quest } from './types';
+import { QuestCard } from '../components/QuestCard';
+import { LandingPage } from '../components/LandingPage';
+import { WaitingPage } from '../components/WaitingPage';
+import { QRModal } from '../components/QRModal';
+import { ScannerOverlay } from '../components/ScannerOverlay';
 import { motion, AnimatePresence } from 'framer-motion';
+import { supabase, testConnection } from './supabase';
+import { signUp, signIn, signOut, onAuthChange, getCurrentUser, updateProfile, type UserProfile } from './auth';
+import { getLevels, getQuests, getShopItems, getUserCompletedQuests, getUserInventory, addQuestRecord, addRedemptionRecord } from './dataService';
 
 const App: React.FC = () => {
-  const [player, setPlayer] = useState<PlayerStats>(() => {
-    const saved = localStorage.getItem('jw_dream_book_v4');
-    if (saved) return JSON.parse(saved);
-    return {
-      hasOnboarded: false,
-      level: 1,
-      coins: 2000,
-      yc: 0,
-      inspiration: 0,
-      completedQuests: [],
-      inventory: [],
-      playStyle: 'Hybrid'
-    };
-  });
-
+  const [isConnected, setIsConnected] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [inviteToken, setInviteToken] = useState<string | null>(null);
+  
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [levels, setLevels] = useState(LEVELS);
+  const [quests, setQuests] = useState(QUESTS);
+  const [shopItems, setShopItems] = useState(GUILD_SHOP);
+  
   const [activeTab, setActiveTab] = useState<'map' | 'quests' | 'shop' | 'profile'>('map');
   const [questSubTab, setQuestSubTab] = useState<'daily' | 'labor' | 'patron'>('daily');
   const [showAscendModal, setShowAscendModal] = useState(false);
   
   const [pendingQuest, setPendingQuest] = useState<Quest | null>(null);
   const [showScanner, setShowScanner] = useState(false);
+  const [completedQuests, setCompletedQuests] = useState<string[]>([]);
+  const [userInventory, setUserInventory] = useState<string[]>([]);
 
+  // 初始化
   useEffect(() => {
-    localStorage.setItem('jw_dream_book_v4', JSON.stringify(player));
-  }, [player]);
+    // 从 sessionStorage 获取邀请码
+    const token = sessionStorage.getItem('jws_invite_token');
+    if (token) {
+      setInviteToken(token);
+    }
+    
+    async function init() {
+      // 测试 Supabase 连接
+      const connected = await testConnection();
+      setIsConnected(connected);
+      
+      if (connected) {
+        // 加载数据
+        await loadData();
+        
+        // 监听登录状态
+        onAuthChange(async (profile) => {
+          setUser(profile);
+          if (profile) {
+            await loadUserData(profile.id);
+          }
+        });
+      }
+      
+      setIsLoading(false);
+    }
+    
+    init();
+  }, []);
 
-  const handleOnboardingComplete = (name: string) => {
-    setPlayer(prev => ({
-      ...prev,
-      playerName: name,
-      hasOnboarded: true
-    }));
-  };
-
-  if (!player.hasOnboarded) {
-    return <LandingScreen onComplete={handleOnboardingComplete} />;
+  async function loadData() {
+    try {
+      // 加载等级
+      const levelData = await getLevels();
+      if (levelData.length > 0) setLevels(levelData);
+      
+      // 加载任务
+      const questData = await getQuests('daily');
+      if (questData.length > 0) setQuests(questData);
+      
+      // 加载商店
+      const shopData = await getShopItems();
+      if (shopData.length > 0) setShopItems(shopData);
+    } catch (err) {
+      console.error('加载数据失败:', err);
+    }
   }
 
-  const currentLevelData = LEVELS[player.level - 1];
-  const canAscend = player.inspiration >= currentLevelData.inspirationRequired;
+  async function loadUserData(userId: string) {
+    const [completed, inventory] = await Promise.all([
+      getUserCompletedQuests(userId),
+      getUserInventory(userId)
+    ]);
+    setCompletedQuests(completed);
+    setUserInventory(inventory);
+  }
 
-  const handleAscend = () => {
-    if (canAscend && player.level < 10) {
-      setPlayer(prev => ({
-        ...prev,
-        level: prev.level + 1,
-      }));
-      setShowAscendModal(false);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+  // 登录/注册处理（带 preUserId）
+  const handleLogin = async (nickname: string, password: string, preUserId: string) => {
+    setIsLoading(true);
+    
+    try {
+      // 注册并关联 pre_users
+      const result = await signUp(nickname, password, preUserId);
+      
+      if (result.error) {
+        alert(result.error.message);
+        return false;
+      }
+      
+      // 清除邀请码
+      sessionStorage.removeItem('jws_invite_token');
+      setInviteToken(null);
+      
+      return true;
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleQuestAction = (id: string) => {
-    const quest = QUESTS.find(q => q.id === id);
+  // 自动登录（已使用邀请码的用户）
+  const handleAutoLogin = async (preUserId: string) => {
+    // 通过 preUserId 获取用户信息并登录
+    const { data: preUser } = await supabase
+      .from('pre_users')
+      .select('used_by')
+      .eq('id', preUserId)
+      .single();
+    
+    if (preUser?.used_by) {
+      // 通过 used_by UUID 查找对应用户
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', preUser.used_by)
+        .single();
+      
+      if (profile) {
+        setUser(profile);
+        await loadUserData(profile.id);
+      }
+    }
+  };
+
+  const handleLogout = async () => {
+    await signOut();
+    setUser(null);
+  };
+
+  const currentLevelData = levels[user?.level ? user.level - 1 : 0] || levels[0];
+  const canAscend = user ? (user.inspiration || 0) >= currentLevelData.inspirationRequired : false;
+
+  const handleAscend = async () => {
+    if (!user || !canAscend) return;
+    
+    const { error } = await updateProfile({ level: user.level + 1 });
+    if (!error) {
+      setUser(prev => prev ? { ...prev, level: prev.level + 1 } : null);
+      setShowAscendModal(false);
+    }
+  };
+
+  const handleQuestAction = async (questId: string) => {
+    if (!user) {
+      alert('请先登录');
+      return;
+    }
+    
+    const quest = quests.find(q => q.id === questId);
     if (!quest) return;
-    if (quest.cost && player.coins < quest.cost) return;
+    
+    if (quest.cost && (user.coins || 0) < quest.cost) {
+      alert('灵石不足');
+      return;
+    }
+    
     setPendingQuest(quest);
   };
 
-  const finalizeQuest = (questToComplete: Quest) => {
-    setPlayer(prev => {
-      let newStyle = prev.playStyle;
-      if (questToComplete.type === 'patron') newStyle = prev.playStyle === 'Artisan' ? 'Hybrid' : 'Collector';
-      if (questToComplete.type === 'labor') newStyle = prev.playStyle === 'Collector' ? 'Hybrid' : 'Artisan';
-
-      return {
-        ...prev,
-        coins: prev.coins - (questToComplete.cost || 0),
-        yc: prev.yc + questToComplete.ycReward,
-        inspiration: prev.inspiration + questToComplete.insReward,
-        completedQuests: [...prev.completedQuests, questToComplete.id],
-        playStyle: newStyle
-      };
+  const finalizeQuest = async (questToComplete: Quest) => {
+    if (!user) return;
+    
+    // 更新本地状态
+    setCompletedQuests(prev => [...prev, questToComplete.id]);
+    
+    // 更新数据库
+    await addQuestRecord(user.id, questToComplete.id);
+    await updateProfile({
+      coins: (user.coins || 0) - (questToComplete.cost || 0),
+      yc: (user.yc || 0) + questToComplete.ycReward,
+      inspiration: (user.inspiration || 0) + questToComplete.insReward
     });
+    
+    // 更新本地用户状态
+    setUser(prev => prev ? ({
+      ...prev,
+      coins: prev.coins - (questToComplete.cost || 0),
+      yc: prev.yc + questToComplete.ycReward,
+      inspiration: prev.inspiration + questToComplete.insReward
+    }) : null);
     
     setPendingQuest(null);
     alert(`核验成功！心愿「${questToComplete.title}」已圆满达成。`);
   };
 
-  const handleScanSuccess = (data: string) => {
+  const handleScanSuccess = async (data: string) => {
     setShowScanner(false);
-    if (pendingQuest) {
-      finalizeQuest(pendingQuest);
-    } else {
-      alert("秘钥识别成功：工坊签到完成！获得 10 织梦币 (YC)");
-      setPlayer(prev => ({ ...prev, yc: prev.yc + 10 }));
-    }
-  };
-
-  const handleBuyItem = (itemId: string, cost: number) => {
-    if (player.yc < cost) {
-      alert("织梦币(YC)不足，多去完成心愿吧。");
+    
+    if (!user) {
+      alert('请先登录');
       return;
     }
-    setPlayer(prev => ({
-      ...prev,
-      yc: prev.yc - cost,
-      inventory: [...prev.inventory, itemId]
-    }));
-    alert("兑换成功，凭证已入乾坤袋。");
+    
+    if (pendingQuest) {
+      await finalizeQuest(pendingQuest);
+    } else {
+      // 签到奖励
+      alert('秘钥识别成功：工坊签到完成！获得 10 织梦币 (YC)');
+      await updateProfile({ yc: user.yc + 10 });
+      setUser(prev => prev ? { ...prev, yc: prev.yc + 10 } : null);
+    }
   };
 
-  const getRealmStyles = (realm: Realm) => {
-    if (realm === Realm.SPROUT) return 'text-emerald-700 bg-emerald-50 border-emerald-100';
-    if (realm === Realm.BLOOM) return 'text-rose-700 bg-rose-50 border-rose-100';
+  const handleBuyItem = async (itemId: string, cost: number) => {
+    if (!user) {
+      alert('请先登录');
+      return;
+    }
+    
+    if (user.yc < cost) {
+      alert('织梦币(YC)不足，多去完成心愿吧。');
+      return;
+    }
+    
+    // 更新本地状态
+    setUserInventory(prev => [...prev, itemId]);
+    
+    // 更新数据库
+    await addRedemptionRecord(user.id, itemId, cost);
+    await updateProfile({ yc: user.yc - cost });
+    
+    setUser(prev => prev ? { ...prev, yc: prev.yc - cost } : null);
+    alert('兑换成功，凭证已入乾坤袋。');
+  };
+
+  const getRealmStyles = (realm: string) => {
+    if (realm.includes('萌芽')) return 'text-emerald-700 bg-emerald-50 border-emerald-100';
+    if (realm.includes('花期')) return 'text-rose-700 bg-rose-50 border-rose-100';
     return 'text-amber-700 bg-amber-50 border-amber-100';
   };
+
+  // 显示等待页面（没有邀请码）
+  if (!isLoading && !user && !inviteToken) {
+    return (
+      <WaitingPage 
+        onRefresh={() => {
+          const token = sessionStorage.getItem('jws_invite_token');
+          if (token) {
+            setInviteToken(token);
+          }
+        }}
+      />
+    );
+  }
+
+  // 显示登录页面（未登录但有邀请码）
+  if (!isLoading && !user) {
+    return (
+      <LandingPage 
+        onLogin={handleLogin}
+        onAutoLogin={handleAutoLogin}
+        isLoading={isLoading}
+        token={inviteToken || undefined}
+      />
+    );
+  }
+
+  // 加载中
+  if (isLoading) {
+    return (
+      <div className="max-w-md mx-auto min-h-screen bg-[#fcfaf7] flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-4xl mb-4">🧶</div>
+          <p className="text-slate-600 font-serif">正在连接织梦手记...</p>
+          {!isConnected && <p className="text-xs text-amber-500 mt-2">演示模式</p>}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-md mx-auto min-h-screen pb-24 bg-[#fcfaf7] relative shadow-2xl flex flex-col font-serif paper-texture">
@@ -124,27 +289,27 @@ const App: React.FC = () => {
           <div>
             <h1 className="text-2xl font-black text-slate-800 tracking-tighter">织梦手记</h1>
             <p className="text-[9px] uppercase tracking-widest text-amber-500 font-bold">
-              {player.playerName} 的工坊 · {player.level} 境
+              {user?.nickname || '访客'} 的工坊 · {user?.level || 1} 境
             </p>
           </div>
           <div className="flex flex-col items-end gap-1">
             <div className="px-3 py-1 bg-amber-50 text-amber-700 rounded-full text-[10px] font-bold border border-amber-100 shadow-sm">
-              YC: {player.yc}
+              YC: {user?.yc || 0}
             </div>
             <div className="px-3 py-1 bg-slate-50 text-slate-500 rounded-full text-[10px] font-bold border border-slate-100">
-              灵石: {player.coins}
+              灵石: {user?.coins || 0}
             </div>
           </div>
         </div>
         <div className="space-y-1">
           <div className="flex justify-between items-end">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">灵感值</span>
-            <span className="text-[10px] font-bold text-slate-800">{player.inspiration} / {currentLevelData.inspirationRequired}</span>
+            <span className="text-[10px] font-bold text-slate-800">{user?.inspiration || 0} / {currentLevelData.inspirationRequired}</span>
           </div>
           <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
             <div 
               className="h-full bg-gradient-to-r from-emerald-400 via-rose-300 to-amber-400 transition-all duration-1000"
-              style={{ width: `${Math.min((player.inspiration / currentLevelData.inspirationRequired) * 100, 100)}%` }}
+              style={{ width: `${Math.min(((user?.inspiration || 0) / currentLevelData.inspirationRequired) * 100, 100)}%` }}
             ></div>
           </div>
         </div>
@@ -158,7 +323,7 @@ const App: React.FC = () => {
               <div className="relative z-10 space-y-6">
                 <div className="flex items-center gap-5">
                   <div className="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center text-white text-3xl font-black shadow-lg transform -rotate-3 border-4 border-white">
-                    {player.level}
+                    {user?.level || 1}
                   </div>
                   <div>
                     <h2 className="text-2xl font-black text-slate-800">{currentLevelData.title}</h2>
@@ -169,7 +334,7 @@ const App: React.FC = () => {
                 </div>
                 <div className="p-5 bg-[#fefcf9] rounded-xl border border-dashed border-slate-200">
                   <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 italic">本阶里程碑作品</h3>
-                  <p className="text-sm font-medium leading-relaxed text-slate-700">“{currentLevelData.exam}”</p>
+                  <p className="text-sm font-medium leading-relaxed text-slate-700">"{currentLevelData.exam}"</p>
                 </div>
                 <button 
                   onClick={() => setShowAscendModal(true)}
@@ -178,15 +343,15 @@ const App: React.FC = () => {
                     canAscend ? 'bg-slate-800 text-white hover:bg-slate-700' : 'bg-slate-50 text-slate-300 border'
                   }`}
                 >
-                  {canAscend ? '灵感充沛 · 请求晋升' : `还需 ${currentLevelData.inspirationRequired - player.inspiration} 灵感`}
+                  {canAscend ? '灵感充沛 · 请求晋升' : `还需 ${currentLevelData.inspirationRequired - (user?.inspiration || 0)} 灵感`}
                 </button>
               </div>
             </div>
             <div className="flex gap-4 overflow-x-auto pb-4 scroll-hide px-1">
               {SKILL_PATHS.map(path => (
                 <div key={path.id} className={`min-w-[150px] p-5 rounded-2xl border text-center transition-all bg-white shadow-sm ${
-                  player.skillPath === path.id ? 'border-rose-400 bg-rose-50/30' : 'border-slate-100'
-                } ${player.level < 3 ? 'opacity-30 grayscale' : ''}`}>
+                  user?.skill_path === path.id ? 'border-rose-400 bg-rose-50/30' : 'border-slate-100'
+                } ${(user?.level || 0) < 3 ? 'opacity-30 grayscale' : ''}`}>
                   <span className="text-4xl block mb-3">{path.icon}</span>
                   <h4 className="text-sm font-bold text-slate-800">{path.name}</h4>
                   <p className="text-[10px] text-slate-400 mt-1">{path.focus}</p>
@@ -219,14 +384,14 @@ const App: React.FC = () => {
               ))}
             </div>
             <div className="space-y-6">
-              {QUESTS.filter(q => q.type === questSubTab).map(quest => (
+              {quests.filter(q => q.type === questSubTab).map(quest => (
                 <QuestCard 
                   key={quest.id} 
                   quest={quest} 
-                  playerLevel={player.level} 
-                  isCompleted={player.completedQuests.includes(quest.id)}
+                  playerLevel={user?.level || 1}
+                  isCompleted={completedQuests.includes(quest.id)}
                   isPending={pendingQuest?.id === quest.id}
-                  canAfford={!quest.cost || player.coins >= quest.cost}
+                  canAfford={!quest.cost || (user?.coins || 0) >= (quest.cost || 0)}
                   onAccept={handleQuestAction}
                 />
               ))}
@@ -240,7 +405,7 @@ const App: React.FC = () => {
               <span className="text-2xl">🏛️</span> 织梦阁
             </h2>
             <div className="grid grid-cols-2 gap-4">
-              {GUILD_SHOP.map(item => (
+              {shopItems.map(item => (
                 <div key={item.id} className="bg-white p-6 rounded-2xl border shadow-sm flex flex-col items-center text-center">
                   <span className="text-4xl mb-4 transform transition-transform hover:scale-110">{item.icon}</span>
                   <h4 className="text-xs font-black text-slate-800 mb-1">{item.name}</h4>
@@ -260,32 +425,41 @@ const App: React.FC = () => {
         {activeTab === 'profile' && (
           <div className="fade-in space-y-6">
             <div className="bg-white p-8 rounded-2xl border text-center relative shadow-sm">
+              <button 
+                onClick={handleLogout}
+                className="absolute top-4 right-4 text-xs text-slate-400 hover:text-slate-600"
+              >
+                退出登录
+              </button>
               <div className="w-24 h-24 mx-auto mb-5 rounded-full border-4 border-rose-100 overflow-hidden bg-slate-50 p-1">
-                 <img className="w-full h-full rounded-full" src={`https://api.dicebear.com/7.x/adventurer/svg?seed=${player.inspiration}`} alt="Avatar" />
+                 <img className="w-full h-full rounded-full" src={`https://api.dicebear.com/7.x/adventurer/svg?seed=${user?.nickname || 'default'}`} alt="Avatar" />
               </div>
-              <h2 className="text-xl font-black text-slate-800">{player.playerName}</h2>
-              <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-1">第 {player.level} 境 织梦人</p>
-              <p className="text-[10px] mt-2 text-rose-500 font-bold uppercase tracking-widest">{player.playStyle} 流派修行中</p>
+              <h2 className="text-xl font-black text-slate-800">{user?.nickname}</h2>
+              <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-1">第 {user?.level || 1} 境 织梦人</p>
+              <p className="text-[10px] mt-2 text-rose-500 font-bold uppercase tracking-widest">{user?.play_style || 'Hybrid'} 流派修行中</p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-white p-5 rounded-2xl border text-center shadow-sm">
                 <span className="text-[10px] block font-bold text-slate-300 uppercase mb-1">织梦币 (YC)</span>
-                <span className="text-xl font-black text-amber-600">{player.yc}</span>
+                <span className="text-xl font-black text-amber-600">{user?.yc || 0}</span>
               </div>
               <div className="bg-white p-5 rounded-2xl border text-center shadow-sm">
                 <span className="text-[10px] block font-bold text-slate-300 uppercase mb-1">已成心愿</span>
-                <span className="text-xl font-black text-slate-800">{player.completedQuests.length}</span>
+                <span className="text-xl font-black text-slate-800">{completedQuests.length}</span>
               </div>
             </div>
             <div className="bg-slate-800 p-6 rounded-2xl text-white shadow-xl">
               <h3 className="text-[10px] font-bold uppercase tracking-widest mb-4 text-rose-300">乾坤袋</h3>
               <div className="flex flex-wrap gap-3">
-                {player.inventory.map((id, i) => (
-                  <div key={i} className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center text-2xl border border-white/5 transition-transform hover:rotate-12">
-                    {GUILD_SHOP.find(s => s.id === id)?.icon}
-                  </div>
-                ))}
-                {player.inventory.length === 0 && <p className="text-xs text-white/30 italic py-2">乾坤袋空空如也...</p>}
+                {userInventory.map((itemId, i) => {
+                  const item = shopItems.find(s => s.id === itemId);
+                  return (
+                    <div key={i} className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center text-2xl border border-white/5 transition-transform hover:rotate-12">
+                      {item?.icon || '📦'}
+                    </div>
+                  );
+                })}
+                {userInventory.length === 0 && <p className="text-xs text-white/30 italic py-2">乾坤袋空空如也...</p>}
               </div>
             </div>
           </div>
@@ -349,7 +523,7 @@ const App: React.FC = () => {
               </div>
               <div className="bg-[#fefaf6] p-6 rounded-2xl text-sm leading-relaxed text-slate-800 border border-amber-100">
                 <p className="text-[10px] font-bold text-slate-400 uppercase mb-3 tracking-widest">掌门核验课题</p>
-                <p className="font-serif italic text-xl leading-snug">“{currentLevelData.exam}”</p>
+                <p className="font-serif italic text-xl leading-snug">"{currentLevelData.exam}"</p>
               </div>
               <div className="space-y-4 pt-4">
                 <button 
