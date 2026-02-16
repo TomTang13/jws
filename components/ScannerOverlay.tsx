@@ -15,6 +15,13 @@ export const ScannerOverlay: React.FC<ScannerOverlayProps> = ({ onScan, onClose 
   useEffect(() => {
     async function setupScanner() {
       try {
+        // Check if camera API is available
+        if (!navigator.mediaDevices) {
+          setHasPermission(false);
+          setError('相机 API 不可用');
+          return;
+        }
+
         // Check if camera is available
         const devices = await navigator.mediaDevices.enumerateDevices();
         const hasCamera = devices.some(d => d.kind === 'videoinput');

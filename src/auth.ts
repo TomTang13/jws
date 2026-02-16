@@ -12,6 +12,7 @@ export interface UserProfile {
   play_style: 'Artisan' | 'Collector' | 'Hybrid';
   inventory: string[];
   created_at: string;
+  is_master: boolean;
 }
 
 // 昵称登录用占位邮箱（Supabase 校验格式）
@@ -62,7 +63,8 @@ export async function signUp(nickname: string, password: string, preUserId?: str
         yc: 0,
         inspiration: 0,
         play_style: 'Hybrid',
-        inventory: []
+        inventory: [],
+        is_master: false
       }).eq('id', data.user.id);
       if (profileError) {
         console.error('[signUp] 更新档案失败:', profileError);
@@ -80,7 +82,8 @@ export async function signUp(nickname: string, password: string, preUserId?: str
         yc: 0,
         inspiration: 0,
         play_style: 'Hybrid',
-        inventory: []
+        inventory: [],
+        is_master: false
       });
       if (profileError) {
         console.error('[signUp] 创建档案失败:', profileError);
@@ -130,7 +133,8 @@ export async function signUp(nickname: string, password: string, preUserId?: str
         yc: 0,
         inspiration: 0,
         play_style: 'Hybrid',
-        inventory: []
+        inventory: [],
+        is_master: false
       }).eq('id', data.user.id);
       if (profileError) {
         console.error('[signUp] 更新档案失败:', profileError);
@@ -148,7 +152,8 @@ export async function signUp(nickname: string, password: string, preUserId?: str
         yc: 0,
         inspiration: 0,
         play_style: 'Hybrid',
-        inventory: []
+        inventory: [],
+        is_master: false
       });
       if (profileError) {
         console.error('[signUp] 创建档案失败:', profileError);

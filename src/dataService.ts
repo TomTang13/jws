@@ -201,3 +201,68 @@ export async function addRedemptionRecord(
   
   return { error };
 }
+
+// 生成任务二维码
+export async function generateQuestQRCode(
+  questId: string,
+  userId: string
+): Promise<{ qrCodeUrl: string; qrCodeContent: string }> {
+  // 生成唯一的二维码内容
+  const qrCodeContent = `jws:quest:${questId}:${userId}:${Date.now()}:${Math.random().toString(36).substr(2, 9)}`;
+  
+  // 使用在线二维码生成服务
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrCodeContent)}`;
+  
+  // 保存到数据库
+  await supabase
+    .from('quest_qr_codes')
+    .insert({
+      quest_template_id: questId,
+      qr_code_content: qrCodeContent,
+      qr_code_url: qrCodeUrl,
+      user_id: userId,
+      status: 'generated'
+    });
+  
+  return { qrCodeUrl, qrCodeContent };
+}
+
+// 验证任务二维码
+export async function verifyQuestQRCode(
+  qrCodeContent: string
+): Promise<{ ok: boolean; error?: string; questId?: string; userId?: string }> {
+  // 解析二维码内容
+  const parts = qrCodeContent.split(':');
+  if (parts.length < 5 || parts[0] !== 'jws' || parts[1] !== 'quest') {
+    return { ok: false, error: '无效的二维码内容' };
+  }
+  
+  const questId = parts[2];
+  const userId = parts[3];
+  
+  // 检查二维码是否存在
+  const { data: qrCode, error } = await supabase
+    .from('quest_qr_codes')
+    .select('*')
+    .eq('qr_code_content', qrCodeContent)
+    .single();
+  
+  if (error || !qrCode) {
+    return { ok: false, error: '二维码不存在' };
+  }
+  
+  if (qrCode.status === 'verified') {
+    return { ok: false, error: '二维码已验证' };
+  }
+  
+  // 更新二维码状态
+  await supabase
+    .from('quest_qr_codes')
+    .update({
+      status: 'verified',
+      verified_at: new Date().toISOString()
+    })
+    .eq('id', qrCode.id);
+  
+  return { ok: true, questId, userId };
+}
