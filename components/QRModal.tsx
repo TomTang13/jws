@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Quest } from '../types';
+import { Quest } from '../src/types';
 
 interface QRModalProps {
   quest: Quest;

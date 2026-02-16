@@ -1,0 +1,4 @@
+// Supabase 配置
+// 注意：service_role key 用于管理后台，具有完整读写权限
+export const SUPABASE_URL = 'https://dbgpstacfijwubjurbec.supabase.co';
+export const SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRiZ3BzdGFjZmlqd3VianVyYmVjIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MDA5ODU3MywiZXhwIjoyMDg1Njc0NTczfQ.VEx9DIb32r1r2fRXyYnoTeYdUQsYB3Kci_y5jricvsY';

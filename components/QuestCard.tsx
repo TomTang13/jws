@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Quest } from '../types';
+import { Quest } from '../src/types';
 
 interface QuestCardProps {
   quest: Quest;
