@@ -9,7 +9,7 @@ import { ScannerOverlay } from '../components/ScannerOverlay';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase, testConnection } from './supabase';
 import { signUp, signIn, signInWithPasswordOnly, signOut, syncKeyPassword, onAuthChange, getCurrentUser, updateProfile, getTokenBasedPassword, type UserProfile } from './auth';
-import { getLevels, getQuests, getShopItems, getUserCompletedQuests, getUserInventory, addQuestRecord, addRedemptionRecord } from './dataService';
+import { getLevels, getQuests, getShopItems, getUserCompletedQuests, getUserInventory, addQuestRecord, addRedemptionRecord, generateQuestQRCode, verifyQuestQRCode } from './dataService';
 
 const App: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
@@ -29,6 +29,11 @@ const App: React.FC = () => {
   const [showScanner, setShowScanner] = useState(false);
   const [completedQuests, setCompletedQuests] = useState<string[]>([]);
   const [userInventory, setUserInventory] = useState<string[]>([]);
+  const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
+  const [showVerifyConfirm, setShowVerifyConfirm] = useState(false);
+  const [scannedQRCodeContent, setScannedQRCodeContent] = useState<string>('');
+  const [scannedQuestId, setScannedQuestId] = useState<string>('');
+  const [scannedUserId, setScannedUserId] = useState<string>('');
 
   // 初始化
   useEffect(() => {
@@ -243,6 +248,16 @@ const App: React.FC = () => {
       return;
     }
     
+    // 生成任务二维码
+    try {
+      const { qrCodeUrl } = await generateQuestQRCode(questId, user.id);
+      setQrCodeUrl(qrCodeUrl);
+    } catch (error) {
+      console.error('生成二维码失败:', error);
+      // 如果生成二维码失败，使用默认值
+      setQrCodeUrl('https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=jws:quest:error');
+    }
+    
     setPendingQuest(quest);
   };
 
@@ -280,7 +295,27 @@ const App: React.FC = () => {
       return;
     }
     
-    if (pendingQuest) {
+    // 检查是否是师傅
+    if (user.is_master) {
+      // 师傅扫描二维码，验证任务
+      try {
+        const verifyResult = await verifyQuestQRCode(data);
+        if (verifyResult.ok) {
+          // 保存扫描结果
+          setScannedQRCodeContent(data);
+          setScannedQuestId(verifyResult.questId || '');
+          setScannedUserId(verifyResult.userId || '');
+          // 弹出二次确认框
+          setShowVerifyConfirm(true);
+        } else {
+          alert(`二维码验证失败: ${verifyResult.error}`);
+        }
+      } catch (error) {
+        console.error('验证二维码失败:', error);
+        alert('验证二维码失败，请重试');
+      }
+    } else if (pendingQuest) {
+      // 普通用户完成任务
       await finalizeQuest(pendingQuest);
     } else {
       // 签到奖励
@@ -310,6 +345,50 @@ const App: React.FC = () => {
     
     setUser(prev => prev ? { ...prev, yc: prev.yc - cost } : null);
     alert('兑换成功，凭证已入乾坤袋。');
+  };
+  
+  // 处理师傅核验确认
+  const handleVerifyConfirm = async (confirm: boolean) => {
+    setShowVerifyConfirm(false);
+    
+    if (!confirm || !user || !scannedQuestId || !scannedUserId) {
+      return;
+    }
+    
+    try {
+      // 获取任务信息
+      const quest = quests.find(q => q.id === scannedQuestId);
+      if (!quest) {
+        alert('任务不存在');
+        return;
+      }
+      
+      // 添加任务完成记录
+      await addQuestRecord(scannedUserId, scannedQuestId);
+      
+      // 更新用户数据
+      const { data: scannedUser } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', scannedUserId)
+        .single();
+      
+      if (scannedUser) {
+        await supabase
+          .from('profiles')
+          .update({
+            coins: (scannedUser.coins || 0) - (quest.cost || 0),
+            yc: (scannedUser.yc || 0) + quest.ycReward,
+            inspiration: (scannedUser.inspiration || 0) + quest.insReward
+          })
+          .eq('id', scannedUserId);
+      }
+      
+      alert('核验成功！任务已完成。');
+    } catch (error) {
+      console.error('核验确认失败:', error);
+      alert('核验确认失败，请重试');
+    }
   };
 
   const getRealmStyles = (realm: string) => {
@@ -541,15 +620,7 @@ const App: React.FC = () => {
         )}
       </main>
 
-      <div className="fixed right-6 bottom-24 flex flex-col items-center gap-2 z-50">
-        <span className="text-[8px] font-black text-amber-500 bg-white px-2 py-0.5 rounded-full border shadow-sm uppercase tracking-tighter">师傅核验</span>
-        <button 
-          onClick={() => setShowScanner(true)}
-          className="w-14 h-14 bg-amber-400 rounded-full shadow-2xl flex items-center justify-center text-white active:scale-90 transition-transform"
-        >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" /></svg>
-        </button>
-      </div>
+
 
       <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 backdrop-blur-md border-t h-20 flex items-center justify-around z-40 px-4 shadow-lg">
         {[
@@ -572,19 +643,74 @@ const App: React.FC = () => {
       <AnimatePresence>
         {pendingQuest && (
           <QRModal 
+            key="qr-modal"
             quest={pendingQuest} 
+            qrCodeUrl={qrCodeUrl}
             onCancel={() => setPendingQuest(null)} 
             onSimulateVerify={() => finalizeQuest(pendingQuest)}
           />
         )}
         {showScanner && (
           <ScannerOverlay 
+            key="scanner"
             onScan={handleScanSuccess} 
             onClose={() => setShowScanner(false)} 
           />
         )}
+        {user?.is_master && (
+          <motion.div 
+            key="master-button"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="fixed bottom-8 right-8 z-40"
+          >
+            <button
+              onClick={() => setShowScanner(true)}
+              className="bg-emerald-600 text-white px-6 py-3 rounded-full shadow-lg flex items-center gap-2 active:scale-95 transition-all"
+            >
+              <span className="text-lg">📱</span>
+              <span className="font-bold">师傅核验</span>
+            </button>
+          </motion.div>
+        )}
+        {showVerifyConfirm && (
+          <motion.div 
+            key="verify-confirm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-900/80 z-50 flex items-center justify-center p-8 backdrop-blur-sm"
+          >
+            <div className="bg-white rounded-3xl w-full max-w-sm p-10 shadow-2xl space-y-8 border-4 border-emerald-100">
+              <div className="text-center">
+                <div className="text-6xl mb-6 transform transition-transform hover:scale-110">🧶</div>
+                <h2 className="text-3xl font-black text-slate-800">师傅核验确认</h2>
+                <p className="text-[10px] text-slate-400 mt-2 uppercase tracking-[0.3em] font-bold">Verification Confirmation</p>
+              </div>
+              <div className="space-y-4">
+                <p className="text-center text-slate-600">确定通过此任务的核验吗？</p>
+                <div className="flex gap-4">
+                  <button
+                    onClick={() => handleVerifyConfirm(false)}
+                    className="flex-1 py-3 border border-slate-200 text-slate-400 rounded-xl font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all"
+                  >
+                    取消
+                  </button>
+                  <button
+                    onClick={() => handleVerifyConfirm(true)}
+                    className="flex-1 py-3 bg-emerald-500 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-200 active:translate-y-1 transition-all"
+                  >
+                    确认通过
+                  </button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
         {showAscendModal && (
           <motion.div 
+            key="ascend-modal"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}

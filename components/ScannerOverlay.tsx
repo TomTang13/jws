@@ -15,6 +15,13 @@ export const ScannerOverlay: React.FC<ScannerOverlayProps> = ({ onScan, onClose 
   useEffect(() => {
     async function setupScanner() {
       try {
+        // Check if camera API is available
+        if (!navigator.mediaDevices) {
+          setHasPermission(false);
+          setError('相机 API 不可用');
+          return;
+        }
+
         // Check if camera is available
         const devices = await navigator.mediaDevices.enumerateDevices();
         const hasCamera = devices.some(d => d.kind === 'videoinput');
@@ -76,7 +83,7 @@ export const ScannerOverlay: React.FC<ScannerOverlayProps> = ({ onScan, onClose 
         {/* QR Reader Container */}
         <div 
           id="qr-reader" 
-          className="absolute inset-0 w-full h-full"
+          className="absolute inset-0 flex items-center justify-center"
           style={{ 
             position: 'absolute',
             top: 0,

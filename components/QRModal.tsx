@@ -5,11 +5,12 @@ import { Quest } from '../src/types';
 
 interface QRModalProps {
   quest: Quest;
+  qrCodeUrl: string;
   onCancel: () => void;
   onSimulateVerify: () => void;
 }
 
-export const QRModal: React.FC<QRModalProps> = ({ quest, onCancel, onSimulateVerify }) => {
+export const QRModal: React.FC<QRModalProps> = ({ quest, qrCodeUrl, onCancel, onSimulateVerify }) => {
   return (
     <div className="fixed inset-0 z-[100] bg-slate-900/90 flex items-center justify-center p-8 backdrop-blur-md">
       <motion.div 
@@ -40,16 +41,13 @@ export const QRModal: React.FC<QRModalProps> = ({ quest, onCancel, onSimulateVer
            <p className="text-sm font-bold text-slate-700">{quest.title}</p>
         </div>
 
-        {/* Mock QR Code SVG */}
-        <div className="p-4 bg-white border-4 border-slate-100 rounded-3xl shadow-inner relative group z-10">
-          <svg width="180" height="180" viewBox="0 0 100 100" className="opacity-90">
-            <rect width="100" height="100" fill="white" />
-            <path d="M10,10 h20 v20 h-20 z M70,10 h20 v20 h-20 z M10,70 h20 v20 h-20 z M35,10 h5 M45,10 h5 M55,10 h5 M10,35 v5 M10,45 v5 M10,55 v5" stroke="black" strokeWidth="2" fill="none" />
-            <path d="M35,35 h30 v30 h-30 z" fill="black" opacity="0.1" />
-            <rect x="40" y="40" width="20" height="20" fill="#e1a6ad" />
-            <path d="M15,15 h10 v10 h-10 z M75,15 h10 v10 h-10 z M15,75 h10 v10 h-10 z" fill="black" />
-            <path d="M35,20 h10 v2 h-10 z M60,15 h5 v5 h-5 z M20,35 h5 v10 h-5 z M45,45 h10 v5 h-10 z M70,55 h15 v5 h-15 z M35,70 h10 v10 h-10 z" fill="black" />
-          </svg>
+        {/* Real QR Code */}
+        <div className="p-4 bg-white border-4 border-slate-100 rounded-3xl shadow-inner relative group z-10 flex items-center justify-center">
+          <img 
+            src={qrCodeUrl} 
+            alt="任务核验二维码" 
+            className="w-48 h-48 object-contain"
+          />
           <motion.div 
             animate={{ opacity: [0.3, 0.6, 0.3] }}
             transition={{ duration: 2, repeat: Infinity }}
