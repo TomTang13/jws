@@ -99,6 +99,12 @@ const App: React.FC = () => {
         alert(result.error.message);
         return false;
       }
+      // 注册成功后，手动获取用户档案并更新 user 状态
+      const userProfile = await getCurrentUser();
+      if (userProfile) {
+        setUser(userProfile);
+        await loadUserData(userProfile.id);
+      }
       sessionStorage.removeItem('jws_invite_token');
       setInviteToken(null);
       return true;

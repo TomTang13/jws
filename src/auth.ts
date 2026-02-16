@@ -23,6 +23,7 @@ const isConfirmationEmailError = (msg: string) =>
 
 // 注册
 export async function signUp(nickname: string, password: string, preUserId?: string) {
+  console.log('[signUp] 开始注册流程:', { nickname, preUserId });
   const { data, error } = await supabase.auth.signUp({
     email: placeholderEmail(nickname),
     password: password,
@@ -31,25 +32,63 @@ export async function signUp(nickname: string, password: string, preUserId?: str
     }
   });
 
+  console.log('[signUp] 注册结果:', { data, error });
+  
   // 若是「发送确认邮件」类错误但用户已创建：仍完成建档并尝试直接登录（不依赖邮件）
   if (error && data?.user && isConfirmationEmailError(error.message)) {
+    console.log('[signUp] 遇到邮件确认错误，开始创建档案');
     if (preUserId) {
+      console.log('[signUp] 更新 pre_users 表:', { preUserId, userId: data.user.id });
       await supabase.from('pre_users').update({
         is_used: true,
         used_by: data.user.id
       }).eq('id', preUserId);
     }
-    const { error: profileError } = await supabase.from('profiles').insert({
-      id: data.user.id,
-      nickname: nickname,
-      level: 1,
-      coins: 2000,
-      yc: 0,
-      inspiration: 0,
-      play_style: 'Hybrid',
-      inventory: []
-    });
-    if (profileError) console.error('创建档案失败:', profileError);
+    
+    // 检查 profiles 表中是否已存在记录
+    const { data: existingProfile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', data.user.id)
+      .single();
+    
+    if (existingProfile) {
+      // 已存在记录，更新它
+      console.log('[signUp] 更新 profiles 表:', { userId: data.user.id, nickname });
+      const { error: profileError } = await supabase.from('profiles').update({
+        nickname: nickname,
+        level: 1,
+        coins: 2000,
+        yc: 0,
+        inspiration: 0,
+        play_style: 'Hybrid',
+        inventory: []
+      }).eq('id', data.user.id);
+      if (profileError) {
+        console.error('[signUp] 更新档案失败:', profileError);
+      } else {
+        console.log('[signUp] 更新档案成功');
+      }
+    } else {
+      // 不存在记录，插入新记录
+      console.log('[signUp] 插入 profiles 表:', { userId: data.user.id, nickname });
+      const { error: profileError } = await supabase.from('profiles').insert({
+        id: data.user.id,
+        nickname: nickname,
+        level: 1,
+        coins: 2000,
+        yc: 0,
+        inspiration: 0,
+        play_style: 'Hybrid',
+        inventory: []
+      });
+      if (profileError) {
+        console.error('[signUp] 创建档案失败:', profileError);
+      } else {
+        console.log('[signUp] 创建档案成功');
+      }
+    }
+    
     const signInResult = await signInWithPasswordOnly(nickname, password);
     if (!signInResult.error) return { data: signInResult.data };
     // 若项目强制邮件确认，登录会失败，提示在控制台关闭「确认邮件」
@@ -65,23 +104,58 @@ export async function signUp(nickname: string, password: string, preUserId?: str
 
   // 创建用户档案
   if (data.user) {
+    console.log('[signUp] 注册成功，开始创建档案');
     if (preUserId) {
+      console.log('[signUp] 更新 pre_users 表:', { preUserId, userId: data.user.id });
       await supabase.from('pre_users').update({
         is_used: true,
         used_by: data.user.id
       }).eq('id', preUserId);
     }
-    const { error: profileError } = await supabase.from('profiles').insert({
-      id: data.user.id,
-      nickname: nickname,
-      level: 1,
-      coins: 2000,
-      yc: 0,
-      inspiration: 0,
-      play_style: 'Hybrid',
-      inventory: []
-    });
-    if (profileError) console.error('创建档案失败:', profileError);
+    
+    // 检查 profiles 表中是否已存在记录
+    const { data: existingProfile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', data.user.id)
+      .single();
+    
+    if (existingProfile) {
+      // 已存在记录，更新它
+      console.log('[signUp] 更新 profiles 表:', { userId: data.user.id, nickname });
+      const { error: profileError } = await supabase.from('profiles').update({
+        nickname: nickname,
+        level: 1,
+        coins: 2000,
+        yc: 0,
+        inspiration: 0,
+        play_style: 'Hybrid',
+        inventory: []
+      }).eq('id', data.user.id);
+      if (profileError) {
+        console.error('[signUp] 更新档案失败:', profileError);
+      } else {
+        console.log('[signUp] 更新档案成功');
+      }
+    } else {
+      // 不存在记录，插入新记录
+      console.log('[signUp] 插入 profiles 表:', { userId: data.user.id, nickname });
+      const { error: profileError } = await supabase.from('profiles').insert({
+        id: data.user.id,
+        nickname: nickname,
+        level: 1,
+        coins: 2000,
+        yc: 0,
+        inspiration: 0,
+        play_style: 'Hybrid',
+        inventory: []
+      });
+      if (profileError) {
+        console.error('[signUp] 创建档案失败:', profileError);
+      } else {
+        console.log('[signUp] 创建档案成功');
+      }
+    }
   }
 
   return { data, error };

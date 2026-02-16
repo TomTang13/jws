@@ -86,8 +86,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onAutoLogin, 
       } else {
         console.log('[validateToken] 邀请码首次使用，进入新手引导:', data.id);
         // 首次使用：进入新手引导，落款时只填昵称，建 profile、改 is_used 并登录
+        // 如果 pre_users 表中有 nickname，则预填，否则让用户输入
         setPreUserNickname(data.nickname || null);
-        setName(data.nickname || '');
+        // 只有当 pre_users 表中有 nickname 时才设置 name，否则保持为空，让用户输入
+        if (data.nickname) {
+          setName(data.nickname);
+        } else {
+          setName('');
+        }
         setAct(1);
       }
     } catch (e: any) {
@@ -109,6 +115,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onAutoLogin, 
   }, [isPressing, act]);
 
   const handleSubmit = async () => {
+    console.log('[LandingPage] 提交表单，用户输入的昵称:', name);
     if (!name.trim()) {
       setLoginError('请输入工坊代号（昵称）');
       return;
@@ -118,6 +125,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onAutoLogin, 
       return;
     }
     setLoginError('');
+    console.log('[LandingPage] 调用 onLogin，传递昵称:', name.trim());
     const success = await onLogin(name.trim(), preUserId);
     if (!success) setLoginError('落款失败，请重试');
   };
