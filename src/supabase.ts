@@ -1,12 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Use fixed values instead of environment variables to ensure consistency
+const supabaseUrl = 'https://dbgpstacfijwubjurbec.supabase.co';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRiZ3BzdGFjZmlqd3VianVyYmVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAwOTg1NzMsImV4cCI6MjA4NTY3NDU3M30.nCPwue-y4RxlP0t3DBwJj_owGsInJaLiHl_rrAByXXU';
 
-export const supabase = createClient(
-  supabaseUrl || 'https://dbgpstacfijwubjurbec.supabase.co',
-  supabaseAnonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRiZ3BzdGFjZmlqd3VianVyYmVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAwOTg1NzMsImV4cCI6MjA4NTY3NDU3M30.nCPwue-y4RxlP0t3DBwJj_owGsInJaLiHl_rrAByXXU'
-);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // 测试连接
 export async function testConnection() {
