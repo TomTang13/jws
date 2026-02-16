@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&family=Varela+Round&display=swap');
+
+body {
+    font-family: 'Noto Serif SC', serif;
+    background-color: #fdfbf7;
+    color: #4a4a4a;
+    -webkit-tap-highlight-color: transparent;
+    overflow-x: hidden;
+}
+
+.font-round {
+    font-family: 'Varela Round', sans-serif;
+}
+
+.scroll-hide::-webkit-scrollbar {
+    display: none;
+}
+
+.paper-texture {
+    background-image: url("https://www.transparenttextures.com/patterns/natural-paper.png");
+}
