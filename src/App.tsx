@@ -75,9 +75,16 @@ const App: React.FC = () => {
       const levelData = await getLevels();
       if (levelData.length > 0) setLevels(levelData);
       
-      // 加载任务
-      const questData = await getQuests('daily');
-      if (questData.length > 0) setQuests(questData);
+      // 加载所有类型的任务
+      const [dailyQuests, laborQuests, patronQuests] = await Promise.all([
+        getQuests('daily'),
+        getQuests('labor'),
+        getQuests('patron')
+      ]);
+      
+      // 合并所有任务
+      const allQuests = [...dailyQuests, ...laborQuests, ...patronQuests];
+      if (allQuests.length > 0) setQuests(allQuests);
       
       // 加载商店
       const shopData = await getShopItems();
