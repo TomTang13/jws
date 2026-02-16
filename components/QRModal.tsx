@@ -1,5 +1,5 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Quest } from '../src/types';
 import { checkQuestStatus } from '../src/dataService';
@@ -13,11 +13,15 @@ interface QRModalProps {
 }
 
 export const QRModal: React.FC<QRModalProps> = ({ quest, qrCodeUrl, onCancel, onSimulateVerify, userId }) => {
+  const [countdown, setCountdown] = useState(120);
+
   useEffect(() => {
     // Auto-check verification status every 2 seconds
     const checkInterval = setInterval(async () => {
       try {
+        console.log('Checking quest status...');
         const isCompleted = await checkQuestStatus(userId, quest.id);
+        console.log('Quest status check result:', isCompleted);
         if (isCompleted) {
           // Quest has been verified, complete the process
           onSimulateVerify();
@@ -27,8 +31,25 @@ export const QRModal: React.FC<QRModalProps> = ({ quest, qrCodeUrl, onCancel, on
       }
     }, 2000);
 
-    return () => clearInterval(checkInterval);
-  }, [quest.id, userId, onSimulateVerify]);
+    // Countdown timer
+    const countdownInterval = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(countdownInterval);
+          // QR code expired
+          onCancel();
+          alert('二维码已超时失效，请重新生成');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => {
+      clearInterval(checkInterval);
+      clearInterval(countdownInterval);
+    };
+  }, [quest.id, userId, onSimulateVerify, onCancel]);
 
   return (
     <div className="fixed inset-0 z-[100] bg-slate-900/90 flex items-center justify-center p-8 backdrop-blur-md">
@@ -81,6 +102,10 @@ export const QRModal: React.FC<QRModalProps> = ({ quest, qrCodeUrl, onCancel, on
           <div className="flex items-center justify-center gap-1">
              <span className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse"></span>
              <span className="text-[9px] font-bold text-amber-600 uppercase tracking-tighter">等待师傅法力接入...</span>
+          </div>
+          <div className="flex items-center justify-center gap-2">
+            <span className="text-[10px] font-bold text-slate-500 uppercase">剩余时间</span>
+            <span className="text-[10px] font-black text-rose-500">{countdown}秒</span>
           </div>
         </div>
 
