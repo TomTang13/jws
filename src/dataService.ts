@@ -134,15 +134,19 @@ export async function getUserCompletedQuests(userId: string): Promise<string[]> 
 
 // 检查特定任务的状态
 export async function checkQuestStatus(userId: string, questId: string): Promise<boolean> {
-  const { data } = await supabase
-    .from('user_quests')
-    .select('status')
-    .eq('user_id', userId)
-    .eq('quest_template_id', questId)
-    .eq('status', 'completed')
-    .single();
-  
-  return !!data;
+  try {
+    const { data } = await supabase
+      .from('user_quests')
+      .select('status')
+      .eq('user_id', userId)
+      .eq('quest_template_id', questId)
+      .eq('status', 'completed');
+    
+    return data && data.length > 0;
+  } catch (error) {
+    console.error('Error checking quest status:', error);
+    return false;
+  }
 }
 
 // 获取用户背包
