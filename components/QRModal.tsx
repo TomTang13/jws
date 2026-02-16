@@ -2,7 +2,7 @@
 import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Quest } from '../src/types';
-import { getUserCompletedQuests } from '../src/dataService';
+import { checkQuestStatus } from '../src/dataService';
 
 interface QRModalProps {
   quest: Quest;
@@ -17,8 +17,8 @@ export const QRModal: React.FC<QRModalProps> = ({ quest, qrCodeUrl, onCancel, on
     // Auto-check verification status every 2 seconds
     const checkInterval = setInterval(async () => {
       try {
-        const completedQuests = await getUserCompletedQuests(userId);
-        if (completedQuests.includes(quest.id)) {
+        const isCompleted = await checkQuestStatus(userId, quest.id);
+        if (isCompleted) {
           // Quest has been verified, complete the process
           onSimulateVerify();
         }
