@@ -15,6 +15,114 @@ export interface UserProfile {
   is_master: boolean;
 }
 
+// 检查并更新登录次数
+export async function checkAndUpdateLoginCount(preUserId: string): Promise<{ 
+  success: boolean; 
+  message?: string; 
+  dailyLoginCount?: number; 
+  dailyLoginLimit?: number; 
+  error?: string 
+}> {
+  try {
+    // 获取当前时间
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    // 查询 pre_users 表
+    const { data: preUser, error: preUserError } = await supabase
+      .from('pre_users')
+      .select('last_login_at, daily_login_count, daily_login_limit')
+      .eq('id', preUserId)
+      .single();
+    
+    if (preUserError) {
+      console.error('查询 pre_users 失败:', preUserError);
+      return { success: false, error: '查询用户信息失败' };
+    }
+    
+    let dailyLoginCount = preUser.daily_login_count || 1;
+    const dailyLoginLimit = preUser.daily_login_limit || 5;
+    
+    // 检查是否为同一天
+    if (preUser.last_login_at) {
+      const lastLoginDate = new Date(preUser.last_login_at);
+      const lastLoginDay = new Date(lastLoginDate.getFullYear(), lastLoginDate.getMonth(), lastLoginDate.getDate());
+      
+      if (today.getTime() === lastLoginDay.getTime()) {
+        // 同一天，增加登录次数
+        dailyLoginCount += 1;
+        
+        // 检查是否超过限制
+        if (dailyLoginCount > dailyLoginLimit) {
+          return { 
+            success: false, 
+            message: '仙缘用尽', 
+            dailyLoginCount: dailyLoginLimit, 
+            dailyLoginLimit 
+          };
+        }
+      } else {
+        // 不同天，重置登录次数
+        dailyLoginCount = 1;
+      }
+    } else {
+      // 首次登录
+      dailyLoginCount = 1;
+    }
+    
+    // 更新 pre_users 表
+    const { error: updateError } = await supabase
+      .from('pre_users')
+      .update({
+        last_login_at: now.toISOString(),
+        daily_login_count: dailyLoginCount
+      })
+      .eq('id', preUserId);
+    
+    if (updateError) {
+      console.error('更新登录次数失败:', updateError);
+      return { success: false, error: '更新登录次数失败' };
+    }
+    
+    return { 
+      success: true, 
+      dailyLoginCount, 
+      dailyLoginLimit 
+    };
+  } catch (error) {
+    console.error('检查登录次数失败:', error);
+    return { success: false, error: '检查登录次数失败' };
+  }
+}
+
+// 记录登录历史
+export async function recordLoginHistory(
+  userId: string,
+  preUserId: string,
+  status: 'success' | 'failed' | 'pending',
+  errorMessage?: string
+) {
+  try {
+    const { error } = await supabase
+      .from('login_history')
+      .insert({
+        user_id: userId,
+        pre_user_id: preUserId,
+        login_time: new Date().toISOString(),
+        ip_address: '', // 可以从请求中获取
+        user_agent: navigator.userAgent,
+        status,
+        error_message: errorMessage
+      });
+    
+    if (error) {
+      console.error('记录登录历史失败:', error);
+    }
+  } catch (error) {
+    console.error('记录登录历史异常:', error);
+  }
+}
+
 // 昵称登录用占位邮箱（Supabase 校验格式）
 const placeholderEmail = (nickname: string) => `${encodeURIComponent(nickname)}@users.jws.alincraft.com`;
 

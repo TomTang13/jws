@@ -4,7 +4,7 @@ import { supabase } from '../src/supabase';
 
 interface LandingPageProps {
   onLogin: (nickname: string, preUserId: string) => Promise<boolean>;
-  onAutoLogin: (preUserId: string, token: string) => Promise<{ ok: boolean; error?: string }>;
+  onAutoLogin: (preUserId: string, token: string) => Promise<{ ok: boolean; error?: string; dailyLoginCount?: number; dailyLoginLimit?: number }>;
   isLoading: boolean;
   token?: string;
 }
@@ -37,7 +37,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onAutoLogin, 
       if (cancelled) return;
       setAutoLoggingIn(false);
       if (!res.ok) {
-        setLoginError(res.error || '自动登录失败，请重试。');
+        if (res.error === '仙缘用尽') {
+          // 登录次数超限，进入仙缘用尽页面
+          setAct(5);
+        } else {
+          setLoginError(res.error || '自动登录失败，请重试。');
+        }
       }
     });
     return () => { cancelled = true; };
@@ -236,6 +241,36 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onAutoLogin, 
         >
           落款领新手手记
         </motion.button>
+      </div>
+    );
+  }
+
+  // 阶段5：仙缘用尽
+  if (act === 5) {
+    return (
+      <div className="fixed inset-0 z-[100] bg-[#fdfbf7] flex flex-col items-center justify-center p-8 overflow-hidden paper-texture">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5 }}
+          className="text-center space-y-8"
+        >
+          <div className="text-8xl opacity-80">🌙</div>
+          <h2 className="text-2xl font-black text-slate-800 italic">仙缘用尽</h2>
+          <p className="text-sm font-serif text-slate-600 max-w-xs">
+            今日进入工坊的次数已达上限，请明日再来。
+            每一次的相遇，都值得珍惜。
+          </p>
+          <p className="text-xs font-serif text-slate-400">
+            明日辰时（早上7点）将恢复仙缘
+          </p>
+          <motion.button
+            onClick={() => window.location.reload()}
+            className="px-8 py-3 bg-slate-800 text-white rounded-full text-sm font-bold tracking-widest shadow-xl active:scale-95 transition-all"
+          >
+            明日再来
+          </motion.button>
+        </motion.div>
       </div>
     );
   }

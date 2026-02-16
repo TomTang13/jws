@@ -8,7 +8,7 @@ import { QRModal } from '../components/QRModal';
 import { ScannerOverlay } from '../components/ScannerOverlay';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase, testConnection } from './supabase';
-import { signUp, signIn, signInWithPasswordOnly, signOut, syncKeyPassword, onAuthChange, getCurrentUser, updateProfile, getTokenBasedPassword, type UserProfile } from './auth';
+import { signUp, signIn, signInWithPasswordOnly, signOut, syncKeyPassword, onAuthChange, getCurrentUser, updateProfile, getTokenBasedPassword, type UserProfile, checkAndUpdateLoginCount, recordLoginHistory } from './auth';
 import { getLevels, getQuests, getShopItems, getUserCompletedQuests, getUserInventory, addQuestRecord, addRedemptionRecord, generateQuestQRCode, verifyQuestQRCode } from './dataService';
 
 const App: React.FC = () => {
@@ -20,6 +20,8 @@ const App: React.FC = () => {
   const [levels, setLevels] = useState(LEVELS);
   const [quests, setQuests] = useState(QUESTS);
   const [shopItems, setShopItems] = useState(GUILD_SHOP);
+  const [dailyLoginCount, setDailyLoginCount] = useState<number>(1);
+  const [dailyLoginLimit, setDailyLoginLimit] = useState<number>(5);
   
   const [activeTab, setActiveTab] = useState<'map' | 'quests' | 'shop' | 'profile'>('map');
   const [questSubTab, setQuestSubTab] = useState<'daily' | 'labor' | 'patron'>('daily');
@@ -98,6 +100,26 @@ const App: React.FC = () => {
   const handleLogin = async (nickname: string, preUserId: string) => {
     setIsLoading(true);
     try {
+      // 检查登录次数限制
+      console.log('[handleLogin] 检查登录次数限制...');
+      const loginCheckResult = await checkAndUpdateLoginCount(preUserId);
+      console.log('[handleLogin] 登录次数检查结果:', loginCheckResult);
+      
+      if (!loginCheckResult.success) {
+        console.error('[handleLogin] 登录次数检查失败:', loginCheckResult.error || loginCheckResult.message);
+        if (loginCheckResult.message === '仙缘用尽') {
+          // 登录次数超限，显示错误
+          alert('仙缘用尽，今日进入工坊的次数已达上限');
+        } else {
+          alert(loginCheckResult.error || '登录检查失败');
+        }
+        return false;
+      }
+      
+      // 更新登录次数状态
+      setDailyLoginCount(loginCheckResult.dailyLoginCount || 1);
+      setDailyLoginLimit(loginCheckResult.dailyLoginLimit || 5);
+      
       const password = getTokenBasedPassword(preUserId);
       const result = await signUp(nickname, password, preUserId);
       if (result.error) {
@@ -109,6 +131,10 @@ const App: React.FC = () => {
       if (userProfile) {
         setUser(userProfile);
         await loadUserData(userProfile.id);
+        
+        // 记录登录历史
+        console.log('[handleLogin] 登录成功，记录登录历史...');
+        await recordLoginHistory(userProfile.id, preUserId, 'success');
       }
       sessionStorage.removeItem('jws_invite_token');
       setInviteToken(null);
@@ -119,9 +145,24 @@ const App: React.FC = () => {
   };
 
   // 已使用过密钥 t：仅凭 t 即可登录（服务端同步派生密码后直接登入，用户无需输入密码）。
-  const handleAutoLogin = async (preUserId: string, rawToken: string): Promise<{ ok: boolean; error?: string }> => {
+  const handleAutoLogin = async (preUserId: string, rawToken: string): Promise<{ ok: boolean; error?: string; dailyLoginCount?: number; dailyLoginLimit?: number }> => {
     console.log('[handleAutoLogin] 开始自动登录流程:', { preUserId, rawToken });
     try {
+      // 检查登录次数限制
+      console.log('[handleAutoLogin] 检查登录次数限制...');
+      const loginCheckResult = await checkAndUpdateLoginCount(preUserId);
+      console.log('[handleAutoLogin] 登录次数检查结果:', loginCheckResult);
+      
+      if (!loginCheckResult.success) {
+        console.error('[handleAutoLogin] 登录次数检查失败:', loginCheckResult.error || loginCheckResult.message);
+        return { 
+          ok: false, 
+          error: loginCheckResult.message || loginCheckResult.error || '登录检查失败',
+          dailyLoginCount: loginCheckResult.dailyLoginCount,
+          dailyLoginLimit: loginCheckResult.dailyLoginLimit
+        };
+      }
+      
       // 检查 pre_users 表中是否有对应的记录
       console.log('[handleAutoLogin] 查询 pre_users 表...');
       const { data: preRow, error: preRowError } = await supabase
@@ -202,14 +243,25 @@ const App: React.FC = () => {
         };
       }
       
+      // 登录成功，记录登录历史
+      console.log('[handleAutoLogin] 登录成功，记录登录历史...');
+      await recordLoginHistory(preRow.used_by, preUserId, 'success');
+      
       // 登录成功
       console.log('[handleAutoLogin] 登录成功，加载用户数据...');
       sessionStorage.removeItem('jws_invite_token');
       setInviteToken(null);
       setUser(profile);
+      // 更新登录次数状态
+      setDailyLoginCount(loginCheckResult.dailyLoginCount || 1);
+      setDailyLoginLimit(loginCheckResult.dailyLoginLimit || 5);
       await loadUserData(profile.id);
       console.log('[handleAutoLogin] 自动登录流程完成');
-      return { ok: true };
+      return { 
+        ok: true,
+        dailyLoginCount: loginCheckResult.dailyLoginCount,
+        dailyLoginLimit: loginCheckResult.dailyLoginLimit
+      };
     } catch (e: any) {
       console.error('[handleAutoLogin] 自动登录异常:', { message: e.message, stack: e.stack });
       return { ok: false, error: `自动登录异常: ${e.message}` };
@@ -444,6 +496,9 @@ const App: React.FC = () => {
             <h1 className="text-2xl font-black text-slate-800 tracking-tighter">织梦手记</h1>
             <p className="text-[9px] uppercase tracking-widest text-amber-500 font-bold">
               {user?.nickname || '访客'} 的工坊 · {user?.level || 1} 境
+            </p>
+            <p className="text-[8px] font-bold text-slate-400 uppercase mt-1">
+              这是您今天 {dailyLoginCount}/{dailyLoginLimit} 次进入织梦手记
             </p>
           </div>
           <div className="flex flex-col items-end gap-1">
