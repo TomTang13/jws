@@ -132,6 +132,19 @@ export async function getUserCompletedQuests(userId: string): Promise<string[]> 
   return data?.map(q => q.quest_template_id) || [];
 }
 
+// 检查特定任务的状态
+export async function checkQuestStatus(userId: string, questId: string): Promise<boolean> {
+  const { data } = await supabase
+    .from('user_quests')
+    .select('status')
+    .eq('user_id', userId)
+    .eq('quest_template_id', questId)
+    .eq('status', 'completed')
+    .single();
+  
+  return !!data;
+}
+
 // 获取用户背包
 export async function getUserInventory(userId: string): Promise<string[]> {
   const { data } = await supabase

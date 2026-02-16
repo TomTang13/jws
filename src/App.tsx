@@ -641,13 +641,14 @@ const App: React.FC = () => {
       </nav>
 
       <AnimatePresence>
-        {pendingQuest && (
+        {pendingQuest && user && (
           <QRModal 
             key="qr-modal"
             quest={pendingQuest} 
             qrCodeUrl={qrCodeUrl}
             onCancel={() => setPendingQuest(null)} 
             onSimulateVerify={() => finalizeQuest(pendingQuest)}
+            userId={user.id}
           />
         )}
         {showScanner && (

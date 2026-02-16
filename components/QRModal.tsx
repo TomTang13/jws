@@ -1,16 +1,35 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Quest } from '../src/types';
+import { checkQuestStatus } from '../src/dataService';
 
 interface QRModalProps {
   quest: Quest;
   qrCodeUrl: string;
   onCancel: () => void;
   onSimulateVerify: () => void;
+  userId: string;
 }
 
-export const QRModal: React.FC<QRModalProps> = ({ quest, qrCodeUrl, onCancel, onSimulateVerify }) => {
+export const QRModal: React.FC<QRModalProps> = ({ quest, qrCodeUrl, onCancel, onSimulateVerify, userId }) => {
+  useEffect(() => {
+    // Auto-check verification status every 2 seconds
+    const checkInterval = setInterval(async () => {
+      try {
+        const isCompleted = await checkQuestStatus(userId, quest.id);
+        if (isCompleted) {
+          // Quest has been verified, complete the process
+          onSimulateVerify();
+        }
+      } catch (error) {
+        console.error('Error checking verification status:', error);
+      }
+    }, 2000);
+
+    return () => clearInterval(checkInterval);
+  }, [quest.id, userId, onSimulateVerify]);
+
   return (
     <div className="fixed inset-0 z-[100] bg-slate-900/90 flex items-center justify-center p-8 backdrop-blur-md">
       <motion.div 
@@ -71,12 +90,6 @@ export const QRModal: React.FC<QRModalProps> = ({ quest, qrCodeUrl, onCancel, on
             className="w-full py-3 border border-slate-200 text-slate-400 rounded-xl font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all"
           >
             暂不核验 (返回)
-          </button>
-          <button 
-            onClick={onSimulateVerify}
-            className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-200 active:translate-y-1 transition-all"
-          >
-            模拟核验通过
           </button>
         </div>
       </motion.div>
