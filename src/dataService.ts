@@ -135,13 +135,20 @@ export async function getUserCompletedQuests(userId: string): Promise<string[]> 
 // 检查特定任务的状态
 export async function checkQuestStatus(userId: string, questId: string): Promise<boolean> {
   try {
-    const { data } = await supabase
+    console.log('Checking quest status with:', { userId, questId });
+    const { data, error } = await supabase
       .from('user_quests')
       .select('status')
       .eq('user_id', userId)
       .eq('quest_template_id', questId)
       .eq('status', 'completed');
     
+    if (error) {
+      console.error('Supabase error checking quest status:', error);
+      return false;
+    }
+    
+    console.log('Quest status check data:', data);
     return data && data.length > 0;
   } catch (error) {
     console.error('Error checking quest status:', error);
