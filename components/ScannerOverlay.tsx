@@ -83,7 +83,7 @@ export const ScannerOverlay: React.FC<ScannerOverlayProps> = ({ onScan, onClose 
         {/* QR Reader Container */}
         <div 
           id="qr-reader" 
-          className="absolute inset-0 w-full h-full"
+          className="absolute inset-0 flex items-center justify-center"
           style={{ 
             position: 'absolute',
             top: 0,

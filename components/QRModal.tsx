@@ -42,7 +42,7 @@ export const QRModal: React.FC<QRModalProps> = ({ quest, qrCodeUrl, onCancel, on
         </div>
 
         {/* Real QR Code */}
-        <div className="p-4 bg-white border-4 border-slate-100 rounded-3xl shadow-inner relative group z-10">
+        <div className="p-4 bg-white border-4 border-slate-100 rounded-3xl shadow-inner relative group z-10 flex items-center justify-center">
           <img 
             src={qrCodeUrl} 
             alt="任务核验二维码" 
