@@ -9,7 +9,7 @@ import { ScannerOverlay } from '../components/ScannerOverlay';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase, testConnection } from './supabase';
 import { signUp, signIn, signInWithPasswordOnly, signOut, syncKeyPassword, onAuthChange, getCurrentUser, updateProfile, getTokenBasedPassword, type UserProfile, checkAndUpdateLoginCount, recordLoginHistory } from './auth';
-import { getLevels, getQuests, getShopItems, getUserCompletedQuests, getUserInventory, addQuestRecord, addRedemptionRecord, generateQuestQRCode, verifyQuestQRCode } from './dataService';
+import { getLevels, getQuests, getShopItems, getUserCompletedQuests, getUserInventory, addQuestRecord, addRedemptionRecord, generateQuestQRCode, verifyQuestQRCode, expireQuestQRCode, cancelQuestQRCode } from './dataService';
 
 const App: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
@@ -32,6 +32,7 @@ const App: React.FC = () => {
   const [completedQuests, setCompletedQuests] = useState<string[]>([]);
   const [userInventory, setUserInventory] = useState<string[]>([]);
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
+  const [qrCodeContent, setQrCodeContent] = useState<string>('');
   const [showVerifyConfirm, setShowVerifyConfirm] = useState(false);
   const [scannedQRCodeContent, setScannedQRCodeContent] = useState<string>('');
   const [scannedQuestId, setScannedQuestId] = useState<string>('');
@@ -75,9 +76,16 @@ const App: React.FC = () => {
       const levelData = await getLevels();
       if (levelData.length > 0) setLevels(levelData);
       
-      // 加载任务
-      const questData = await getQuests('daily');
-      if (questData.length > 0) setQuests(questData);
+      // 加载所有类型的任务
+      const [dailyQuests, laborQuests, patronQuests] = await Promise.all([
+        getQuests('daily'),
+        getQuests('labor'),
+        getQuests('patron')
+      ]);
+      
+      // 合并所有任务
+      const allQuests = [...dailyQuests, ...laborQuests, ...patronQuests];
+      if (allQuests.length > 0) setQuests(allQuests);
       
       // 加载商店
       const shopData = await getShopItems();
@@ -107,9 +115,9 @@ const App: React.FC = () => {
       
       if (!loginCheckResult.success) {
         console.error('[handleLogin] 登录次数检查失败:', loginCheckResult.error || loginCheckResult.message);
-        if (loginCheckResult.message === '仙缘用尽') {
+        if (loginCheckResult.message === '工坊能量耗尽') {
           // 登录次数超限，显示错误
-          alert('仙缘用尽，今日进入工坊的次数已达上限');
+          alert('工坊能量耗尽，今日进入工坊的次数已达上限');
         } else {
           alert(loginCheckResult.error || '登录检查失败');
         }
@@ -296,18 +304,20 @@ const App: React.FC = () => {
     if (!quest) return;
     
     if (quest.cost && (user.coins || 0) < quest.cost) {
-      alert('灵石不足');
+      alert('织梦币不足');
       return;
     }
     
     // 生成任务二维码
     try {
-      const { qrCodeUrl } = await generateQuestQRCode(questId, user.id);
+      const { qrCodeUrl, qrCodeContent } = await generateQuestQRCode(questId, user.id);
       setQrCodeUrl(qrCodeUrl);
+      setQrCodeContent(qrCodeContent);
     } catch (error) {
       console.error('生成二维码失败:', error);
       // 如果生成二维码失败，使用默认值
       setQrCodeUrl('https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=jws:quest:error');
+      setQrCodeContent('jws:quest:error');
     }
     
     setPendingQuest(quest);
@@ -506,13 +516,13 @@ const App: React.FC = () => {
               YC: {user?.yc || 0}
             </div>
             <div className="px-3 py-1 bg-slate-50 text-slate-500 rounded-full text-[10px] font-bold border border-slate-100">
-              灵石: {user?.coins || 0}
+              织梦币: {user?.coins || 0}
             </div>
           </div>
         </div>
         <div className="space-y-1">
           <div className="flex justify-between items-end">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">灵感值</span>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">创意值</span>
             <span className="text-[10px] font-bold text-slate-800">{user?.inspiration || 0} / {currentLevelData.inspirationRequired}</span>
           </div>
           <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
@@ -552,7 +562,7 @@ const App: React.FC = () => {
                     canAscend ? 'bg-slate-800 text-white hover:bg-slate-700' : 'bg-slate-50 text-slate-300 border'
                   }`}
                 >
-                  {canAscend ? '灵感充沛 · 请求晋升' : `还需 ${currentLevelData.inspirationRequired - (user?.inspiration || 0)} 灵感`}
+                  {canAscend ? '创意满溢 · 请求晋升' : `还需 ${currentLevelData.inspirationRequired - (user?.inspiration || 0)} 创意`}
                 </button>
               </div>
             </div>
@@ -701,7 +711,18 @@ const App: React.FC = () => {
             key="qr-modal"
             quest={pendingQuest} 
             qrCodeUrl={qrCodeUrl}
-            onCancel={() => setPendingQuest(null)} 
+            qrCodeContent={qrCodeContent}
+            onCancel={() => {
+              // Cancel the QR code in the database
+              if (qrCodeContent) {
+                cancelQuestQRCode(qrCodeContent).then(result => {
+                  if (!result.ok) {
+                    console.error('取消二维码失败:', result.error);
+                  }
+                });
+              }
+              setPendingQuest(null);
+            }} 
             onSimulateVerify={() => finalizeQuest(pendingQuest)}
             userId={user.id}
           />

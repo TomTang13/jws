@@ -89,7 +89,7 @@ export async function getQuests(type: 'daily' | 'labor' | 'patron'): Promise<Que
     title: q.title,
     description: q.description,
     targetLv: q.min_level,
-    rewardText: `${q.reward_coins} 灵石 + ${q.reward_inspiration} 灵感`,
+    rewardText: `${q.reward_coins} 织梦币 + ${q.reward_inspiration} 创意`,
     ycReward: q.reward_coins,
     insReward: q.reward_inspiration,
     cost: q.cost_coins,
@@ -279,14 +279,87 @@ export async function verifyQuestQRCode(
     return { ok: false, error: '二维码已验证' };
   }
   
+  if (qrCode.status === 'expired') {
+    return { ok: false, error: '二维码已过期' };
+  }
+  
+  if (qrCode.status === 'cancelled') {
+    return { ok: false, error: '二维码已取消' };
+  }
+  
   // 更新二维码状态
   await supabase
     .from('quest_qr_codes')
     .update({
       status: 'verified',
-      verified_at: new Date().toISOString()
+      verified_at: new Date().toISOString(),
+      scanned_at: new Date().toISOString()
     })
     .eq('id', qrCode.id);
   
   return { ok: true, questId, userId };
+}
+
+// 过期任务二维码
+export async function expireQuestQRCode(
+  qrCodeContent: string
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    // 检查二维码是否存在
+    const { data: qrCode, error } = await supabase
+      .from('quest_qr_codes')
+      .select('*')
+      .eq('qr_code_content', qrCodeContent)
+      .single();
+    
+    if (error || !qrCode) {
+      return { ok: false, error: '二维码不存在' };
+    }
+    
+    // 更新二维码状态为过期
+    await supabase
+      .from('quest_qr_codes')
+      .update({
+        status: 'expired',
+        expired_at: new Date().toISOString()
+      })
+      .eq('id', qrCode.id);
+    
+    return { ok: true };
+  } catch (error) {
+    console.error('过期二维码失败:', error);
+    return { ok: false, error: '过期二维码失败' };
+  }
+}
+
+// 取消任务二维码
+export async function cancelQuestQRCode(
+  qrCodeContent: string
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    // 检查二维码是否存在
+    const { data: qrCode, error } = await supabase
+      .from('quest_qr_codes')
+      .select('*')
+      .eq('qr_code_content', qrCodeContent)
+      .single();
+    
+    if (error || !qrCode) {
+      return { ok: false, error: '二维码不存在' };
+    }
+    
+    // 更新二维码状态为取消
+    await supabase
+      .from('quest_qr_codes')
+      .update({
+        status: 'cancelled',
+        cancelled_at: new Date().toISOString()
+      })
+      .eq('id', qrCode.id);
+    
+    return { ok: true };
+  } catch (error) {
+    console.error('取消二维码失败:', error);
+    return { ok: false, error: '取消二维码失败' };
+  }
 }

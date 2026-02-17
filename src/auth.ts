@@ -56,7 +56,7 @@ export async function checkAndUpdateLoginCount(preUserId: string): Promise<{
         if (dailyLoginCount > dailyLoginLimit) {
           return { 
             success: false, 
-            message: '仙缘用尽', 
+            message: '工坊能量耗尽', 
             dailyLoginCount: dailyLoginLimit, 
             dailyLoginLimit 
           };

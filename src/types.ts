@@ -1,7 +1,7 @@
 
 export enum Realm {
   SPROUT = '萌芽期 · 织梦起航',
-  BLOOM = '花期 · 灵感迸发',
+  BLOOM = '花期 · 创意迸发',
   HARVEST = '果实期 · 匠心结盟'
 }
 

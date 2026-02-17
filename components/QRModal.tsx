@@ -2,17 +2,18 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Quest } from '../src/types';
-import { checkQuestStatus } from '../src/dataService';
+import { checkQuestStatus, expireQuestQRCode } from '../src/dataService';
 
 interface QRModalProps {
   quest: Quest;
   qrCodeUrl: string;
+  qrCodeContent: string;
   onCancel: () => void;
   onSimulateVerify: () => void;
   userId: string;
 }
 
-export const QRModal: React.FC<QRModalProps> = ({ quest, qrCodeUrl, onCancel, onSimulateVerify, userId }) => {
+export const QRModal: React.FC<QRModalProps> = ({ quest, qrCodeUrl, qrCodeContent, onCancel, onSimulateVerify, userId }) => {
   const [countdown, setCountdown] = useState(120);
 
   useEffect(() => {
@@ -36,9 +37,6 @@ export const QRModal: React.FC<QRModalProps> = ({ quest, qrCodeUrl, onCancel, on
       setCountdown((prev) => {
         if (prev <= 1) {
           clearInterval(countdownInterval);
-          // QR code expired
-          onCancel();
-          alert('二维码已超时失效，请重新生成');
           return 0;
         }
         return prev - 1;
@@ -49,7 +47,21 @@ export const QRModal: React.FC<QRModalProps> = ({ quest, qrCodeUrl, onCancel, on
       clearInterval(checkInterval);
       clearInterval(countdownInterval);
     };
-  }, [quest.id, userId, onSimulateVerify, onCancel]);
+  }, [quest.id, userId, onSimulateVerify]);
+
+  // Handle countdown expiration
+  useEffect(() => {
+    if (countdown === 0) {
+      // Expire the QR code in the database
+      expireQuestQRCode(qrCodeContent).then(result => {
+        if (!result.ok) {
+          console.error('过期二维码失败:', result.error);
+        }
+      });
+      onCancel();
+      alert('二维码已超时失效，请重新生成');
+    }
+  }, [countdown, onCancel, qrCodeContent]);
 
   return (
     <div className="fixed inset-0 z-[100] bg-slate-900/90 flex items-center justify-center p-8 backdrop-blur-md">
