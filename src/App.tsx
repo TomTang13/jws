@@ -9,7 +9,7 @@ import { ScannerOverlay } from '../components/ScannerOverlay';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase, testConnection } from './supabase';
 import { signUp, signIn, signInWithPasswordOnly, signOut, syncKeyPassword, onAuthChange, getCurrentUser, updateProfile, getTokenBasedPassword, type UserProfile, checkAndUpdateLoginCount, recordLoginHistory } from './auth';
-import { getLevels, getQuests, getShopItems, getUserCompletedQuests, getUserInventory, addQuestRecord, addRedemptionRecord, generateQuestQRCode, verifyQuestQRCode, expireQuestQRCode } from './dataService';
+import { getLevels, getQuests, getShopItems, getUserCompletedQuests, getUserInventory, addQuestRecord, addRedemptionRecord, generateQuestQRCode, verifyQuestQRCode, expireQuestQRCode, cancelQuestQRCode } from './dataService';
 
 const App: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
@@ -712,7 +712,17 @@ const App: React.FC = () => {
             quest={pendingQuest} 
             qrCodeUrl={qrCodeUrl}
             qrCodeContent={qrCodeContent}
-            onCancel={() => setPendingQuest(null)} 
+            onCancel={() => {
+              // Cancel the QR code in the database
+              if (qrCodeContent) {
+                cancelQuestQRCode(qrCodeContent).then(result => {
+                  if (!result.ok) {
+                    console.error('取消二维码失败:', result.error);
+                  }
+                });
+              }
+              setPendingQuest(null);
+            }} 
             onSimulateVerify={() => finalizeQuest(pendingQuest)}
             userId={user.id}
           />
