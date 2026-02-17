@@ -9,7 +9,7 @@ import { ScannerOverlay } from '../components/ScannerOverlay';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase, testConnection } from './supabase';
 import { signUp, signIn, signInWithPasswordOnly, signOut, syncKeyPassword, onAuthChange, getCurrentUser, updateProfile, getTokenBasedPassword, type UserProfile, checkAndUpdateLoginCount, recordLoginHistory } from './auth';
-import { getLevels, getQuests, getShopItems, getUserCompletedQuests, getUserInventory, addQuestRecord, addRedemptionRecord, generateQuestQRCode, verifyQuestQRCode } from './dataService';
+import { getLevels, getQuests, getShopItems, getUserCompletedQuests, getUserInventory, addQuestRecord, addRedemptionRecord, generateQuestQRCode, verifyQuestQRCode, expireQuestQRCode } from './dataService';
 
 const App: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
@@ -32,6 +32,7 @@ const App: React.FC = () => {
   const [completedQuests, setCompletedQuests] = useState<string[]>([]);
   const [userInventory, setUserInventory] = useState<string[]>([]);
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
+  const [qrCodeContent, setQrCodeContent] = useState<string>('');
   const [showVerifyConfirm, setShowVerifyConfirm] = useState(false);
   const [scannedQRCodeContent, setScannedQRCodeContent] = useState<string>('');
   const [scannedQuestId, setScannedQuestId] = useState<string>('');
@@ -309,12 +310,14 @@ const App: React.FC = () => {
     
     // 生成任务二维码
     try {
-      const { qrCodeUrl } = await generateQuestQRCode(questId, user.id);
+      const { qrCodeUrl, qrCodeContent } = await generateQuestQRCode(questId, user.id);
       setQrCodeUrl(qrCodeUrl);
+      setQrCodeContent(qrCodeContent);
     } catch (error) {
       console.error('生成二维码失败:', error);
       // 如果生成二维码失败，使用默认值
       setQrCodeUrl('https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=jws:quest:error');
+      setQrCodeContent('jws:quest:error');
     }
     
     setPendingQuest(quest);
@@ -708,6 +711,7 @@ const App: React.FC = () => {
             key="qr-modal"
             quest={pendingQuest} 
             qrCodeUrl={qrCodeUrl}
+            qrCodeContent={qrCodeContent}
             onCancel={() => setPendingQuest(null)} 
             onSimulateVerify={() => finalizeQuest(pendingQuest)}
             userId={user.id}

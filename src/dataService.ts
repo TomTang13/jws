@@ -279,6 +279,10 @@ export async function verifyQuestQRCode(
     return { ok: false, error: '二维码已验证' };
   }
   
+  if (qrCode.status === 'expired') {
+    return { ok: false, error: '二维码已过期' };
+  }
+  
   // 更新二维码状态
   await supabase
     .from('quest_qr_codes')
@@ -289,4 +293,36 @@ export async function verifyQuestQRCode(
     .eq('id', qrCode.id);
   
   return { ok: true, questId, userId };
+}
+
+// 过期任务二维码
+export async function expireQuestQRCode(
+  qrCodeContent: string
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    // 检查二维码是否存在
+    const { data: qrCode, error } = await supabase
+      .from('quest_qr_codes')
+      .select('*')
+      .eq('qr_code_content', qrCodeContent)
+      .single();
+    
+    if (error || !qrCode) {
+      return { ok: false, error: '二维码不存在' };
+    }
+    
+    // 更新二维码状态为过期
+    await supabase
+      .from('quest_qr_codes')
+      .update({
+        status: 'expired',
+        expired_at: new Date().toISOString()
+      })
+      .eq('id', qrCode.id);
+    
+    return { ok: true };
+  } catch (error) {
+    console.error('过期二维码失败:', error);
+    return { ok: false, error: '过期二维码失败' };
+  }
 }
