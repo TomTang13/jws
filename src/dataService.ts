@@ -291,7 +291,9 @@ export async function verifyQuestQRCode(
   await supabase
     .from('quest_qr_codes')
     .update({
-      status: 'verified'
+      status: 'verified',
+      verified_at: new Date().toISOString(),
+      scanned_at: new Date().toISOString()
     })
     .eq('id', qrCode.id);
   
@@ -318,7 +320,8 @@ export async function expireQuestQRCode(
     await supabase
       .from('quest_qr_codes')
       .update({
-        status: 'expired'
+        status: 'expired',
+        expired_at: new Date().toISOString()
       })
       .eq('id', qrCode.id);
     
@@ -349,7 +352,8 @@ export async function cancelQuestQRCode(
     await supabase
       .from('quest_qr_codes')
       .update({
-        status: 'cancelled'
+        status: 'cancelled',
+        cancelled_at: new Date().toISOString()
       })
       .eq('id', qrCode.id);
     
