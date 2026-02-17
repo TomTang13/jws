@@ -114,9 +114,9 @@ const App: React.FC = () => {
       
       if (!loginCheckResult.success) {
         console.error('[handleLogin] 登录次数检查失败:', loginCheckResult.error || loginCheckResult.message);
-        if (loginCheckResult.message === '仙缘用尽') {
+        if (loginCheckResult.message === '工坊能量耗尽') {
           // 登录次数超限，显示错误
-          alert('仙缘用尽，今日进入工坊的次数已达上限');
+          alert('工坊能量耗尽，今日进入工坊的次数已达上限');
         } else {
           alert(loginCheckResult.error || '登录检查失败');
         }
@@ -303,7 +303,7 @@ const App: React.FC = () => {
     if (!quest) return;
     
     if (quest.cost && (user.coins || 0) < quest.cost) {
-      alert('灵石不足');
+      alert('织梦币不足');
       return;
     }
     
@@ -513,13 +513,13 @@ const App: React.FC = () => {
               YC: {user?.yc || 0}
             </div>
             <div className="px-3 py-1 bg-slate-50 text-slate-500 rounded-full text-[10px] font-bold border border-slate-100">
-              灵石: {user?.coins || 0}
+              织梦币: {user?.coins || 0}
             </div>
           </div>
         </div>
         <div className="space-y-1">
           <div className="flex justify-between items-end">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">灵感值</span>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">创意值</span>
             <span className="text-[10px] font-bold text-slate-800">{user?.inspiration || 0} / {currentLevelData.inspirationRequired}</span>
           </div>
           <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
@@ -559,7 +559,7 @@ const App: React.FC = () => {
                     canAscend ? 'bg-slate-800 text-white hover:bg-slate-700' : 'bg-slate-50 text-slate-300 border'
                   }`}
                 >
-                  {canAscend ? '灵感充沛 · 请求晋升' : `还需 ${currentLevelData.inspirationRequired - (user?.inspiration || 0)} 灵感`}
+                  {canAscend ? '创意满溢 · 请求晋升' : `还需 ${currentLevelData.inspirationRequired - (user?.inspiration || 0)} 创意`}
                 </button>
               </div>
             </div>
