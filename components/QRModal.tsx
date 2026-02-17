@@ -24,6 +24,8 @@ export const QRModal: React.FC<QRModalProps> = ({ quest, qrCodeUrl, qrCodeConten
         const isCompleted = await checkQuestStatus(userId, quest.id);
         console.log('Quest status check result:', isCompleted);
         if (isCompleted) {
+          // Clear the interval before completing the process
+          clearInterval(checkInterval);
           // Quest has been verified, complete the process
           onSimulateVerify();
         }
