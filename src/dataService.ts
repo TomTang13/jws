@@ -136,20 +136,39 @@ export async function getUserCompletedQuests(userId: string): Promise<string[]> 
 export async function checkQuestStatus(userId: string, questId: string): Promise<boolean> {
   try {
     console.log('Checking quest status with:', { userId, questId });
-    const { data, error } = await supabase
+    
+    // 先检查 user_quests 表中是否有完成记录
+    const { data: userQuestData, error: userQuestError } = await supabase
       .from('user_quests')
       .select('status')
       .eq('user_id', userId)
       .eq('quest_template_id', questId)
       .eq('status', 'completed');
     
-    if (error) {
-      console.error('Supabase error checking quest status:', error);
-      return false;
+    if (userQuestError) {
+      console.error('Supabase error checking user_quests:', userQuestError);
+    } else if (userQuestData && userQuestData.length > 0) {
+      console.log('Quest status check data (user_quests):', userQuestData);
+      return true;
     }
     
-    console.log('Quest status check data:', data);
-    return data && data.length > 0;
+    // 再检查 quest_qr_codes 表中是否有已验证的二维码
+    const { data: qrCodeData, error: qrCodeError } = await supabase
+      .from('quest_qr_codes')
+      .select('status')
+      .eq('user_id', userId)
+      .eq('quest_template_id', questId)
+      .eq('status', 'verified');
+    
+    if (qrCodeError) {
+      console.error('Supabase error checking quest_qr_codes:', qrCodeError);
+    } else if (qrCodeData && qrCodeData.length > 0) {
+      console.log('Quest status check data (quest_qr_codes):', qrCodeData);
+      return true;
+    }
+    
+    console.log('Quest status check data: []');
+    return false;
   } catch (error) {
     console.error('Error checking quest status:', error);
     return false;
