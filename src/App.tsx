@@ -33,6 +33,7 @@ const App: React.FC = () => {
   const [userInventory, setUserInventory] = useState<string[]>([]);
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
   const [qrCodeContent, setQrCodeContent] = useState<string>('');
+  const [qrCodeId, setQrCodeId] = useState<string>('');
   const [showVerifyConfirm, setShowVerifyConfirm] = useState(false);
   const [scannedQRCodeContent, setScannedQRCodeContent] = useState<string>('');
   const [scannedQuestId, setScannedQuestId] = useState<string>('');
@@ -311,14 +312,16 @@ const App: React.FC = () => {
     
     // 生成任务二维码
     try {
-      const { qrCodeUrl, qrCodeContent } = await generateQuestQRCode(questId, user.id);
+      const { qrCodeUrl, qrCodeContent, qrCodeId } = await generateQuestQRCode(questId, user.id);
       setQrCodeUrl(qrCodeUrl);
       setQrCodeContent(qrCodeContent);
+      setQrCodeId(qrCodeId);
     } catch (error) {
       console.error('生成二维码失败:', error);
       // 如果生成二维码失败，使用默认值
       setQrCodeUrl('https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=jws:quest:error');
       setQrCodeContent('jws:quest:error');
+      setQrCodeId('');
     }
     
     setPendingQuest(quest);
@@ -331,7 +334,7 @@ const App: React.FC = () => {
     setCompletedQuests(prev => [...prev, questToComplete.id]);
     
     // 更新数据库
-    await addQuestRecord(user.id, questToComplete.id);
+    await addQuestRecord(user.id, questToComplete.id, qrCodeId);
     await updateProfile({
       coins: (user.coins || 0) - (questToComplete.cost || 0),
       yc: (user.yc || 0) + questToComplete.ycReward,
@@ -443,7 +446,7 @@ const App: React.FC = () => {
       }
       
       // 添加任务完成记录
-      const addQuestResult = await addQuestRecord(scannedUserId, scannedQuestId);
+      const addQuestResult = await addQuestRecord(scannedUserId, scannedQuestId, scannedQRCodeId);
       if (addQuestResult.error) {
         console.error('添加任务记录失败:', addQuestResult.error);
         alert('添加任务记录失败，请重试');
@@ -740,10 +743,11 @@ const App: React.FC = () => {
             quest={pendingQuest} 
             qrCodeUrl={qrCodeUrl}
             qrCodeContent={qrCodeContent}
+            qrCodeId={qrCodeId}
             onCancel={() => {
               // Cancel the QR code in the database
-              if (qrCodeContent) {
-                cancelQuestQRCode(qrCodeContent).then(result => {
+              if (qrCodeId) {
+                cancelQuestQRCode(qrCodeId).then(result => {
                   if (!result.ok) {
                     console.error('取消二维码失败:', result.error);
                   }
