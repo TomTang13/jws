@@ -123,13 +123,23 @@ export async function getShopItems(): Promise<ShopItem[]> {
 
 // 获取用户已完成任务
 export async function getUserCompletedQuests(userId: string): Promise<string[]> {
-  const { data } = await supabase
-    .from('user_quests')
-    .select('quest_template_id')
-    .eq('user_id', userId)
-    .eq('status', 'completed');
-  
-  return data?.map(q => q.quest_template_id) || [];
+  try {
+    const { data, error } = await supabase
+      .from('user_quests')
+      .select('quest_template_id')
+      .eq('user_id', userId)
+      .eq('status', 'completed');
+    
+    if (error) {
+      console.error('获取已完成任务失败:', error);
+      return [];
+    }
+    
+    return data?.map(q => q.quest_template_id) || [];
+  } catch (error) {
+    console.error('获取已完成任务失败:', error);
+    return [];
+  }
 }
 
 // 检查特定任务的状态
@@ -137,21 +147,21 @@ export async function checkQuestStatus(userId: string, questId: string): Promise
   try {
     console.log('Checking quest status with:', { userId, questId });
     
-    // 检查 quest_qr_codes 表中是否有已验证的二维码
-    const { data: qrCodeData, error: qrCodeError } = await supabase
-      .from('quest_qr_codes')
-      .select('status')
+    // 检查 user_quests 表中是否有已完成的任务记录
+    const { data: userQuestData, error: userQuestError } = await supabase
+      .from('user_quests')
+      .select('id')
       .eq('user_id', userId)
       .eq('quest_template_id', questId)
-      .eq('status', 'verified');
+      .eq('status', 'completed');
     
-    if (qrCodeError) {
-      console.error('Supabase error checking quest_qr_codes:', qrCodeError);
+    if (userQuestError) {
+      console.error('Supabase error checking user_quests:', userQuestError);
       return false;
     }
     
-    console.log('Quest status check data (quest_qr_codes):', qrCodeData);
-    return qrCodeData && qrCodeData.length > 0;
+    console.log('Quest status check data (user_quests):', userQuestData);
+    return userQuestData && userQuestData.length > 0;
   } catch (error) {
     console.error('Error checking quest status:', error);
     return false;
