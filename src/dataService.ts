@@ -89,7 +89,7 @@ export async function getQuests(type: 'daily' | 'labor' | 'patron'): Promise<Que
     title: q.title,
     description: q.description,
     targetLv: q.min_level,
-    rewardText: `${q.reward_coins} 织梦币 + ${q.reward_inspiration} 创意`,
+    rewardText: `${q.reward_coins} 织梦币 + ${q.reward_inspiration} 灵感`,
     ycReward: q.reward_coins,
     insReward: q.reward_inspiration,
     cost: q.cost_coins,

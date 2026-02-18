@@ -58,7 +58,7 @@ export const QuestCard: React.FC<QuestCardProps> = ({ quest, playerLevel, isComp
           <div className="flex flex-col">
             <div className="flex gap-2">
               <span className="text-xs font-bold text-emerald-600">+{quest.insReward} 灵感</span>
-              {quest.ycReward > 0 && <span className="text-xs font-bold text-amber-600">+{quest.ycReward} YC</span>}
+              {quest.ycReward > 0 && <span className="text-xs font-bold text-amber-600">+{quest.ycReward} 织梦币</span>}
             </div>
             {quest.cost && <span className="text-[10px] font-bold text-rose-500 mt-1">支出: ¥{quest.cost}</span>}
           </div>
