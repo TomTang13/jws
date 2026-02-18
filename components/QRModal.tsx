@@ -11,10 +11,11 @@ interface QRModalProps {
   qrCodeId: string;
   onCancel: () => void;
   onSimulateVerify: () => void;
+  onQuestCompleted?: () => void;
   userId: string;
 }
 
-export const QRModal: React.FC<QRModalProps> = ({ quest, qrCodeUrl, qrCodeContent, qrCodeId, onCancel, onSimulateVerify, userId }) => {
+export const QRModal: React.FC<QRModalProps> = ({ quest, qrCodeUrl, qrCodeContent, qrCodeId, onCancel, onSimulateVerify, onQuestCompleted, userId }) => {
   const [countdown, setCountdown] = useState(120);
 
   useEffect(() => {
@@ -31,6 +32,10 @@ export const QRModal: React.FC<QRModalProps> = ({ quest, qrCodeUrl, qrCodeConten
           // Do NOT call onSimulateVerify here as master has already added the quest record
           onCancel();
           alert(`核验成功！心愿「${quest.title}」已圆满达成。`);
+          // 通知父组件更新用户数据
+          if (onQuestCompleted) {
+            onQuestCompleted();
+          }
         }
       } catch (error) {
         console.error('Error checking verification status:', error);
@@ -52,7 +57,7 @@ export const QRModal: React.FC<QRModalProps> = ({ quest, qrCodeUrl, qrCodeConten
       clearInterval(checkInterval);
       clearInterval(countdownInterval);
     };
-  }, [quest.id, userId, onCancel, quest.title]);
+  }, [quest.id, userId, onCancel, quest.title, onQuestCompleted]);
 
   // Handle countdown expiration
   useEffect(() => {

@@ -747,6 +747,14 @@ const App: React.FC = () => {
               setPendingQuest(null);
             }} 
             onSimulateVerify={() => finalizeQuest(pendingQuest)}
+            onQuestCompleted={() => {
+              // 重新加载用户数据，实现无刷更新
+              if (user) {
+                loadUserData(user.id).then(() => {
+                  console.log('用户数据更新成功');
+                });
+              }
+            }}
             userId={user.id}
           />
         )}
