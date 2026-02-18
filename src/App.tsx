@@ -426,7 +426,12 @@ const App: React.FC = () => {
       }
       
       // 添加任务完成记录
-      await addQuestRecord(scannedUserId, scannedQuestId);
+      const addQuestResult = await addQuestRecord(scannedUserId, scannedQuestId);
+      if (addQuestResult.error) {
+        console.error('添加任务记录失败:', addQuestResult.error);
+        alert('添加任务记录失败，请重试');
+        return;
+      }
       
       // 更新用户数据
       const { data: scannedUser } = await supabase
