@@ -453,28 +453,19 @@ const App: React.FC = () => {
         return;
       }
       
-      // 更新用户数据
-      const { data: scannedUser } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', scannedUserId)
-        .single();
+      // 更新用户数据（使用存储过程发放奖励）
+      const { error: updateUserError } = await supabase
+        .rpc('update_user_reward', {
+          p_user_id: scannedUserId,
+          p_cost_coins: quest.cost || 0,
+          p_yc_reward: quest.ycReward,
+          p_inspiration_reward: quest.insReward
+        });
       
-      if (scannedUser) {
-        const { error: updateUserError } = await supabase
-          .from('profiles')
-          .update({
-            coins: (scannedUser.coins || 0) - (quest.cost || 0),
-            yc: (scannedUser.yc || 0) + quest.ycReward,
-            inspiration: (scannedUser.inspiration || 0) + quest.insReward
-          })
-          .eq('id', scannedUserId);
-        
-        if (updateUserError) {
-          console.error('更新用户数据失败:', updateUserError);
-          alert('更新用户数据失败，请重试');
-          return;
-        }
+      if (updateUserError) {
+        console.error('更新用户数据失败:', updateUserError);
+        alert('更新用户数据失败，请重试');
+        return;
       }
       
       alert('核验成功！任务已完成。');
