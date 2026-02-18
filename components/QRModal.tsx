@@ -8,12 +8,13 @@ interface QRModalProps {
   quest: Quest;
   qrCodeUrl: string;
   qrCodeContent: string;
+  qrCodeId: string;
   onCancel: () => void;
   onSimulateVerify: () => void;
   userId: string;
 }
 
-export const QRModal: React.FC<QRModalProps> = ({ quest, qrCodeUrl, qrCodeContent, onCancel, onSimulateVerify, userId }) => {
+export const QRModal: React.FC<QRModalProps> = ({ quest, qrCodeUrl, qrCodeContent, qrCodeId, onCancel, onSimulateVerify, userId }) => {
   const [countdown, setCountdown] = useState(120);
 
   useEffect(() => {
@@ -55,7 +56,7 @@ export const QRModal: React.FC<QRModalProps> = ({ quest, qrCodeUrl, qrCodeConten
   useEffect(() => {
     if (countdown === 0) {
       // Expire the QR code in the database
-      expireQuestQRCode(qrCodeContent).then(result => {
+      expireQuestQRCode(qrCodeId).then(result => {
         if (!result.ok) {
           console.error('过期二维码失败:', result.error);
         }
@@ -64,7 +65,7 @@ export const QRModal: React.FC<QRModalProps> = ({ quest, qrCodeUrl, qrCodeConten
         alert('二维码已超时失效，请重新生成');
       });
     }
-  }, [countdown, onCancel, qrCodeContent]);
+  }, [countdown, onCancel, qrCodeId]);
 
   return (
     <div className="fixed inset-0 z-[100] bg-slate-900/90 flex items-center justify-center p-8 backdrop-blur-md">
