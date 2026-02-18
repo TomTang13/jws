@@ -27,8 +27,10 @@ export const QRModal: React.FC<QRModalProps> = ({ quest, qrCodeUrl, qrCodeConten
         if (isCompleted) {
           // Clear the interval before completing the process
           clearInterval(checkInterval);
-          // Quest has been verified, complete the process
-          onSimulateVerify();
+          // Quest has been verified by master, just close the modal
+          // Do NOT call onSimulateVerify here as master has already added the quest record
+          onCancel();
+          alert(`核验成功！心愿「${quest.title}」已圆满达成。`);
         }
       } catch (error) {
         console.error('Error checking verification status:', error);
@@ -50,7 +52,7 @@ export const QRModal: React.FC<QRModalProps> = ({ quest, qrCodeUrl, qrCodeConten
       clearInterval(checkInterval);
       clearInterval(countdownInterval);
     };
-  }, [quest.id, userId, onSimulateVerify]);
+  }, [quest.id, userId, onCancel, quest.title]);
 
   // Handle countdown expiration
   useEffect(() => {
