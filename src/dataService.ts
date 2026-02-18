@@ -256,7 +256,7 @@ export async function generateQuestQRCode(
 // 验证任务二维码
 export async function verifyQuestQRCode(
   qrCodeContent: string
-): Promise<{ ok: boolean; error?: string; questId?: string; userId?: string }> {
+): Promise<{ ok: boolean; error?: string; questId?: string; userId?: string; qrCodeId?: string }> {
   // 解析二维码内容
   const parts = qrCodeContent.split(':');
   if (parts.length < 5 || parts[0] !== 'jws' || parts[1] !== 'quest') {
@@ -289,17 +289,8 @@ export async function verifyQuestQRCode(
     return { ok: false, error: '二维码已取消' };
   }
   
-  // 更新二维码状态
-  await supabase
-    .from('quest_qr_codes')
-    .update({
-      status: 'verified',
-      verified_at: new Date().toISOString(),
-      scanned_at: new Date().toISOString()
-    })
-    .eq('id', qrCode.id);
-  
-  return { ok: true, questId, userId };
+  // 只返回二维码信息，不更新状态
+  return { ok: true, questId, userId, qrCodeId: qrCode.id };
 }
 
 // 过期任务二维码
@@ -363,5 +354,47 @@ export async function cancelQuestQRCode(
   } catch (error) {
     console.error('取消二维码失败:', error);
     return { ok: false, error: '取消二维码失败' };
+  }
+}
+
+// 更新任务二维码状态
+export async function updateQuestQRCodeStatus(
+  qrCodeId: string
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    // 更新二维码状态为验证
+    await supabase
+      .from('quest_qr_codes')
+      .update({
+        status: 'verified',
+        verified_at: new Date().toISOString(),
+        scanned_at: new Date().toISOString()
+      })
+      .eq('id', qrCodeId);
+    
+    return { ok: true };
+  } catch (error) {
+    console.error('更新二维码状态失败:', error);
+    return { ok: false, error: '更新二维码状态失败' };
+  }
+}
+
+// 检查任务是否已完成
+export async function isQuestCompleted(
+  userId: string,
+  questId: string
+): Promise<boolean> {
+  try {
+    const { data } = await supabase
+      .from('user_quests')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('quest_template_id', questId)
+      .eq('status', 'completed');
+    
+    return data && data.length > 0;
+  } catch (error) {
+    console.error('检查任务状态失败:', error);
+    return false;
   }
 }
