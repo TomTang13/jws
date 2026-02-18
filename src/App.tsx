@@ -9,7 +9,7 @@ import { ScannerOverlay } from '../components/ScannerOverlay';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase, testConnection } from './supabase';
 import { signUp, signIn, signInWithPasswordOnly, signOut, syncKeyPassword, onAuthChange, getCurrentUser, updateProfile, getTokenBasedPassword, type UserProfile, checkAndUpdateLoginCount, recordLoginHistory } from './auth';
-import { getLevels, getQuests, getShopItems, getUserCompletedQuests, getUserInventory, addQuestRecord, addRedemptionRecord, generateQuestQRCode, verifyQuestQRCode, expireQuestQRCode, cancelQuestQRCode } from './dataService';
+import { getLevels, getQuests, getShopItems, getUserCompletedQuests, getUserInventory, addQuestRecord, addRedemptionRecord, generateQuestQRCode, verifyQuestQRCode, expireQuestQRCode, cancelQuestQRCode, updateQuestQRCodeStatus, isQuestCompleted } from './dataService';
 
 const App: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
@@ -37,6 +37,7 @@ const App: React.FC = () => {
   const [scannedQRCodeContent, setScannedQRCodeContent] = useState<string>('');
   const [scannedQuestId, setScannedQuestId] = useState<string>('');
   const [scannedUserId, setScannedUserId] = useState<string>('');
+  const [scannedQRCodeId, setScannedQRCodeId] = useState<string>('');
 
   // 初始化
   useEffect(() => {
@@ -367,6 +368,7 @@ const App: React.FC = () => {
           setScannedQRCodeContent(data);
           setScannedQuestId(verifyResult.questId || '');
           setScannedUserId(verifyResult.userId || '');
+          setScannedQRCodeId(verifyResult.qrCodeId || '');
           // 弹出二次确认框
           setShowVerifyConfirm(true);
         } else {
@@ -413,7 +415,7 @@ const App: React.FC = () => {
   const handleVerifyConfirm = async (confirm: boolean) => {
     setShowVerifyConfirm(false);
     
-    if (!confirm || !user || !scannedQuestId || !scannedUserId) {
+    if (!confirm || !user || !scannedQuestId || !scannedUserId || !scannedQRCodeId) {
       return;
     }
     
@@ -422,6 +424,21 @@ const App: React.FC = () => {
       const quest = quests.find(q => q.id === scannedQuestId);
       if (!quest) {
         alert('任务不存在');
+        return;
+      }
+      
+      // 检查任务是否已完成
+      const isCompleted = await isQuestCompleted(scannedUserId, scannedQuestId);
+      if (isCompleted) {
+        alert('任务已经完成，无需重复核验');
+        return;
+      }
+      
+      // 更新二维码状态
+      const updateStatusResult = await updateQuestQRCodeStatus(scannedQRCodeId);
+      if (updateStatusResult.error) {
+        console.error('更新二维码状态失败:', updateStatusResult.error);
+        alert('更新二维码状态失败，请重试');
         return;
       }
       
@@ -441,7 +458,7 @@ const App: React.FC = () => {
         .single();
       
       if (scannedUser) {
-        await supabase
+        const { error: updateUserError } = await supabase
           .from('profiles')
           .update({
             coins: (scannedUser.coins || 0) - (quest.cost || 0),
@@ -449,6 +466,12 @@ const App: React.FC = () => {
             inspiration: (scannedUser.inspiration || 0) + quest.insReward
           })
           .eq('id', scannedUserId);
+        
+        if (updateUserError) {
+          console.error('更新用户数据失败:', updateUserError);
+          alert('更新用户数据失败，请重试');
+          return;
+        }
       }
       
       alert('核验成功！任务已完成。');
