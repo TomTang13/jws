@@ -9,7 +9,7 @@ import { ScannerOverlay } from '../components/ScannerOverlay';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase, testConnection } from './supabase';
 import { signUp, signIn, signInWithPasswordOnly, signOut, syncKeyPassword, onAuthChange, getCurrentUser, updateProfile, getTokenBasedPassword, type UserProfile, checkAndUpdateLoginCount, recordLoginHistory } from './auth';
-import { getLevels, getQuests, getShopItems, getUserCompletedQuests, getUserInventory, addQuestRecord, addRedemptionRecord, generateQuestQRCode, verifyQuestQRCode, expireQuestQRCode, cancelQuestQRCode, updateQuestQRCodeStatus, isQuestCompleted } from './dataService';
+import { getLevels, getQuests, getShopItems, getUserCompletedQuests, getUserInventory, addQuestRecord, addRedemptionRecord, generateQuestQRCode, verifyQuestQRCode, expireQuestQRCode, cancelQuestQRCode, updateQuestQRCodeStatus, isQuestCompleted, getUserData } from './dataService';
 
 const App: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
@@ -98,12 +98,17 @@ const App: React.FC = () => {
   }
 
   async function loadUserData(userId: string) {
-    const [completed, inventory] = await Promise.all([
+    const [completed, inventory, userData] = await Promise.all([
       getUserCompletedQuests(userId),
-      getUserInventory(userId)
+      getUserInventory(userId),
+      getUserData(userId)
     ]);
     setCompletedQuests(completed);
     setUserInventory(inventory);
+    // 更新用户基本信息，包括织梦币和灵感值
+    if (userData) {
+      setUser(userData);
+    }
   }
 
   // 首次使用密钥 t：仅填昵称，用密钥派生密码注册并登录
