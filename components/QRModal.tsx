@@ -59,9 +59,10 @@ export const QRModal: React.FC<QRModalProps> = ({ quest, qrCodeUrl, qrCodeConten
         if (!result.ok) {
           console.error('过期二维码失败:', result.error);
         }
+        // After expiring the QR code, close the modal
+        onCancel();
+        alert('二维码已超时失效，请重新生成');
       });
-      onCancel();
-      alert('二维码已超时失效，请重新生成');
     }
   }, [countdown, onCancel, qrCodeContent]);
 
