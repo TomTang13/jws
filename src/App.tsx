@@ -386,7 +386,7 @@ const App: React.FC = () => {
       await finalizeQuest(pendingQuest);
     } else {
       // 签到奖励
-      alert('秘钥识别成功：工坊签到完成！获得 10 织梦币 (YC)');
+      alert('秘钥识别成功：工坊签到完成！获得 10 织梦币');
       await updateProfile({ yc: user.yc + 10 });
       setUser(prev => prev ? { ...prev, yc: prev.yc + 10 } : null);
     }
@@ -399,7 +399,7 @@ const App: React.FC = () => {
     }
     
     if (user.yc < cost) {
-      alert('织梦币(YC)不足，多去完成心愿吧。');
+      alert('织梦币不足，多去完成心愿吧。');
       return;
     }
     
@@ -535,16 +535,13 @@ const App: React.FC = () => {
           </div>
           <div className="flex flex-col items-end gap-1">
             <div className="px-3 py-1 bg-amber-50 text-amber-700 rounded-full text-[10px] font-bold border border-amber-100 shadow-sm">
-              YC: {user?.yc || 0}
-            </div>
-            <div className="px-3 py-1 bg-slate-50 text-slate-500 rounded-full text-[10px] font-bold border border-slate-100">
-              织梦币: {user?.coins || 0}
+              织梦币: {user?.yc || 0}
             </div>
           </div>
         </div>
         <div className="space-y-1">
           <div className="flex justify-between items-end">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">创意值</span>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">灵感值</span>
             <span className="text-[10px] font-bold text-slate-800">{user?.inspiration || 0} / {currentLevelData.inspirationRequired}</span>
           </div>
           <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
@@ -655,7 +652,7 @@ const App: React.FC = () => {
                     onClick={() => handleBuyItem(item.id, item.cost)}
                     className="w-full py-2 bg-slate-800 text-white text-[10px] font-bold rounded-lg shadow-md"
                   >
-                    {item.cost} YC
+                    {item.cost} 织梦币
                   </button>
                 </div>
               ))}
@@ -681,8 +678,8 @@ const App: React.FC = () => {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-white p-5 rounded-2xl border text-center shadow-sm">
-                <span className="text-[10px] block font-bold text-slate-300 uppercase mb-1">织梦币 (YC)</span>
-                <span className="text-xl font-black text-amber-600">{user?.yc || 0}</span>
+                <span className="text-[10px] block font-bold text-slate-300 uppercase mb-1">灵感值</span>
+                <span className="text-xl font-black text-emerald-600">{user?.inspiration || 0}</span>
               </div>
               <div className="bg-white p-5 rounded-2xl border text-center shadow-sm">
                 <span className="text-[10px] block font-bold text-slate-300 uppercase mb-1">已成心愿</span>
