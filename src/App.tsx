@@ -111,20 +111,28 @@ const App: React.FC = () => {
                 promotion_pending: updatedUser.promotion_pending
               });
               
-              // 更新用户状态
-              setUser(updatedUser);
-              
-              // 关闭等级提升二维码模态框
-              setShowLevelQRModal(false);
-              setLevelQRCodeUrl('');
-              setLevelQRCodeContent('');
-              setLevelQRCodeId('');
-              setTargetLevel(1);
-              
-              // 显示等级提升成功提示
-              alert(`等级提升成功！您现在是第 ${updatedUser.level} 境织梦人`);
-              
-              console.log('等级提升流程完成，UI 已跳转回主界面');
+              // 检查等级是否真的提升了
+              if (updatedUser.level > user.level) {
+                // 更新用户状态
+                setUser(updatedUser);
+                
+                // 关闭等级提升二维码模态框
+                setShowLevelQRModal(false);
+                setLevelQRCodeUrl('');
+                setLevelQRCodeContent('');
+                setLevelQRCodeId('');
+                setTargetLevel(1);
+                
+                // 显示等级提升成功提示
+                alert(`等级提升成功！您现在是第 ${updatedUser.level} 境织梦人`);
+                
+                console.log('等级提升流程完成，UI 已跳转回主界面');
+              } else {
+                console.warn('等级提升状态检查返回true，但用户等级没有提升:', {
+                  currentLevel: updatedUser.level,
+                  previousLevel: user.level
+                });
+              }
             }
           }
         } catch (error) {
@@ -363,7 +371,7 @@ const App: React.FC = () => {
       const targetLevelValue = user.level + 1;
       const { qrCodeUrl, qrCodeContent, qrCodeId } = await generateLevelQRCode(user.id, user.level, targetLevelValue);
       
-      // 显示等级提升二维码模态框
+      // 直接显示等级提升二维码模态框，跳过中间的晋升UI
       setLevelQRCodeUrl(qrCodeUrl);
       setLevelQRCodeContent(qrCodeContent);
       setLevelQRCodeId(qrCodeId);
@@ -726,13 +734,13 @@ const App: React.FC = () => {
                   <p className="text-sm font-medium leading-relaxed text-slate-700">"{currentLevelData.exam}"</p>
                 </div>
                 <button 
-                  onClick={() => setShowAscendModal(true)}
+                  onClick={handleAscend}
                   disabled={!canAscend}
                   className={`w-full py-4 rounded-xl font-bold text-xs uppercase tracking-widest transition-all transform active:scale-95 shadow-md ${
                     canAscend ? 'bg-slate-800 text-white hover:bg-slate-700' : 'bg-slate-50 text-slate-300 border'
                   }`}
                 >
-                  {canAscend ? '创意满溢 · 请求晋升' : `还需 ${currentLevelData.inspirationRequired - (user?.inspiration || 0)} 创意`}
+                  {canAscend ? '创意满溢 · 开启新篇章' : `还需 ${currentLevelData.inspirationRequired - (user?.inspiration || 0)} 创意`}
                 </button>
               </div>
             </div>

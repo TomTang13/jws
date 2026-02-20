@@ -564,6 +564,8 @@ export async function checkLevelPromotionStatus(
       return false;
     }
     
+    const latestQRCode = qrCodes[0];
+    
     // 然后检查 profiles 表中的等级是否已经更新
     const { data: user, error: userError } = await supabase
       .from('profiles')
@@ -576,8 +578,9 @@ export async function checkLevelPromotionStatus(
     }
     
     // 检查用户的 promotion_pending 状态是否为 false
+    // 并且检查用户的等级是否已经更新到目标等级
     // 这表示等级提升已经完成
-    return !user.promotion_pending;
+    return !user.promotion_pending && user.level >= latestQRCode.target_level;
   } catch (error) {
     console.error('检查等级提升状态失败:', error);
     return false;
