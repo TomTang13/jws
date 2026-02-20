@@ -532,13 +532,14 @@ export async function completeLevelPromotion(
 
 // 检查等级提升状态
 export async function checkLevelPromotionStatus(
-  userId: string
+  qrCodeId: string
 ): Promise<boolean> {
   try {
     // 使用存储过程检查等级提升状态，绕过RLS权限检查
+    // 现在只根据二维码状态判断验证是否成功
     const { data, error } = await supabase
       .rpc('check_level_promotion_status', {
-        p_user_id: userId
+        p_qr_code_id: qrCodeId
       });
     
     if (error) {

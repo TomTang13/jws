@@ -83,11 +83,12 @@ const App: React.FC = () => {
   
   // 检查等级提升状态
   useEffect(() => {
-    if (showLevelQRModal && user) {
+    if (showLevelQRModal && user && levelQRCodeId) {
       const checkInterval = setInterval(async () => {
         try {
           console.log('检查等级提升状态...');
-          const isPromoted = await checkLevelPromotionStatus(user.id);
+          console.log('使用二维码ID检查:', levelQRCodeId);
+          const isPromoted = await checkLevelPromotionStatus(levelQRCodeId);
           console.log('等级提升状态检查结果:', isPromoted);
           
           if (isPromoted) {
@@ -142,7 +143,7 @@ const App: React.FC = () => {
       
       return () => clearInterval(checkInterval);
     }
-  }, [showLevelQRModal, user]);
+  }, [showLevelQRModal, user, levelQRCodeId]);
 
   async function loadData() {
     try {

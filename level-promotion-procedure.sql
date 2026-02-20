@@ -94,49 +94,37 @@ GRANT EXECUTE ON FUNCTION public.complete_level_promotion(
 
 -- 创建检查等级提升状态的函数
 CREATE OR REPLACE FUNCTION public.check_level_promotion_status(
-    p_user_id UUID
+    p_qr_code_id UUID
 )
 RETURNS JSONB AS $$
 DECLARE
-    v_latest_qr_code public.level_qr_codes;
-    v_user public.profiles;
+    v_qr_code public.level_qr_codes;
 BEGIN
-    -- 1. 获取用户最新的已验证等级提升二维码
-    SELECT * INTO v_latest_qr_code FROM public.level_qr_codes
-    WHERE user_id = p_user_id
-    AND status = 'verified'
-    ORDER BY generated_at DESC
-    LIMIT 1;
-    
-    IF NOT FOUND THEN
-        RETURN jsonb_build_object(
-            'status', 'pending'
-        );
-    END IF;
-    
-    -- 2. 获取用户信息
-    SELECT * INTO v_user FROM public.profiles
-    WHERE id = p_user_id;
+    -- 1. 检查二维码是否存在
+    SELECT * INTO v_qr_code FROM public.level_qr_codes
+    WHERE id = p_qr_code_id;
     
     IF NOT FOUND THEN
         RETURN jsonb_build_object(
             'status', 'error',
-            'message', '用户不存在'
+            'message', '二维码不存在'
         );
     END IF;
     
-    -- 3. 检查等级是否已更新且promotion_pending为false
-    IF v_user.level >= v_latest_qr_code.target_level AND NOT v_user.promotion_pending THEN
+    -- 2. 只根据二维码状态判断验证是否成功
+    IF v_qr_code.status = 'verified' THEN
         RETURN jsonb_build_object(
             'status', 'verified',
-            'current_level', v_user.level,
-            'target_level', v_latest_qr_code.target_level
+            'user_id', v_qr_code.user_id,
+            'current_level', v_qr_code.current_level,
+            'target_level', v_qr_code.target_level
         );
     ELSE
         RETURN jsonb_build_object(
             'status', 'pending',
-            'current_level', v_user.level,
-            'target_level', v_latest_qr_code.target_level
+            'user_id', v_qr_code.user_id,
+            'current_level', v_qr_code.current_level,
+            'target_level', v_qr_code.target_level
         );
     END IF;
 END;
