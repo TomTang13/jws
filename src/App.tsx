@@ -92,6 +92,9 @@ const App: React.FC = () => {
           console.log('等级提升状态检查结果:', isPromoted);
           
           if (isPromoted) {
+            // 清除检查间隔，避免重复检查
+            clearInterval(checkInterval);
+            
             // 等级提升已验证，重新加载用户数据
             console.log('等级提升已验证，重新加载用户数据...');
             const { data: updatedUser, error: userError } = await supabase
