@@ -9,7 +9,7 @@ import { ScannerOverlay } from '../components/ScannerOverlay';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase, testConnection } from './supabase';
 import { signUp, signIn, signInWithPasswordOnly, signOut, syncKeyPassword, onAuthChange, getCurrentUser, updateProfile, getTokenBasedPassword, type UserProfile, checkAndUpdateLoginCount, recordLoginHistory } from './auth';
-import { getLevels, getQuests, getShopItems, getUserCompletedQuests, getUserInventory, addQuestRecord, addRedemptionRecord, generateQuestQRCode, verifyQuestQRCode, expireQuestQRCode, cancelQuestQRCode, updateQuestQRCodeStatus, isQuestCompleted, getUserData } from './dataService';
+import { getLevels, getQuests, getShopItems, getUserCompletedQuests, getUserInventory, addQuestRecord, addRedemptionRecord, generateQuestQRCode, verifyQuestQRCode, expireQuestQRCode, cancelQuestQRCode, updateQuestQRCodeStatus, isQuestCompleted, getUserData, generateLevelQRCode, verifyLevelQRCode, completeLevelPromotion, checkLevelPromotionStatus } from './dataService';
 
 const App: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
@@ -39,6 +39,15 @@ const App: React.FC = () => {
   const [scannedQuestId, setScannedQuestId] = useState<string>('');
   const [scannedUserId, setScannedUserId] = useState<string>('');
   const [scannedQRCodeId, setScannedQRCodeId] = useState<string>('');
+  
+  // 等级提升相关状态
+  const [showLevelQRModal, setShowLevelQRModal] = useState(false);
+  const [levelQRCodeUrl, setLevelQRCodeUrl] = useState<string>('');
+  const [levelQRCodeContent, setLevelQRCodeContent] = useState<string>('');
+  const [levelQRCodeId, setLevelQRCodeId] = useState<string>('');
+  const [targetLevel, setTargetLevel] = useState<number>(1);
+  const [scannedLevelData, setScannedLevelData] = useState<{ userId: string; currentLevel: number; targetLevel: number; qrCodeId: string }>({ userId: '', currentLevel: 0, targetLevel: 0, qrCodeId: '' });
+  const [showLevelVerifyConfirm, setShowLevelVerifyConfirm] = useState(false);
 
   // 初始化
   useEffect(() => {
@@ -71,6 +80,39 @@ const App: React.FC = () => {
     
     init();
   }, []);
+  
+  // 检查等级提升状态
+  useEffect(() => {
+    if (showLevelQRModal && user) {
+      const checkInterval = setInterval(async () => {
+        try {
+          const isPromoted = await checkLevelPromotionStatus(user.id);
+          if (isPromoted) {
+            // 等级提升已验证，重新加载用户数据
+            const { data: updatedUser } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', user.id)
+              .single();
+            
+            if (updatedUser) {
+              setUser(updatedUser);
+              setShowLevelQRModal(false);
+              setLevelQRCodeUrl('');
+              setLevelQRCodeContent('');
+              setLevelQRCodeId('');
+              setTargetLevel(1);
+              alert(`等级提升成功！您现在是第 ${updatedUser.level} 境织梦人`);
+            }
+          }
+        } catch (error) {
+          console.error('检查等级提升状态失败:', error);
+        }
+      }, 3000);
+      
+      return () => clearInterval(checkInterval);
+    }
+  }, [showLevelQRModal, user]);
 
   async function loadData() {
     try {
@@ -292,12 +334,68 @@ const App: React.FC = () => {
   const canAscend = user ? (user.inspiration || 0) >= currentLevelData.inspirationRequired : false;
 
   const handleAscend = async () => {
-    if (!user || !canAscend) return;
+    if (!user || !canAscend || user.promotion_pending) return;
     
-    const { error } = await updateProfile({ level: user.level + 1 });
-    if (!error) {
-      setUser(prev => prev ? { ...prev, level: prev.level + 1 } : null);
-      setShowAscendModal(false);
+    try {
+      // 生成等级提升二维码
+      const targetLevelValue = user.level + 1;
+      const { qrCodeUrl, qrCodeContent, qrCodeId } = await generateLevelQRCode(user.id, user.level, targetLevelValue);
+      
+      // 显示等级提升二维码模态框
+      setLevelQRCodeUrl(qrCodeUrl);
+      setLevelQRCodeContent(qrCodeContent);
+      setLevelQRCodeId(qrCodeId);
+      setTargetLevel(targetLevelValue);
+      setShowLevelQRModal(true);
+    } catch (error) {
+      console.error('申请等级提升失败:', error);
+      alert('申请等级提升失败，请重试');
+    }
+  };
+  
+  // 处理等级提升二维码取消
+  const handleLevelQRCancel = async () => {
+    if (levelQRCodeId) {
+      // 这里可以添加取消等级提升二维码的逻辑
+      console.log('取消等级提升二维码:', levelQRCodeId);
+    }
+    
+    // 更新用户状态
+    if (user) {
+      await supabase
+        .from('profiles')
+        .update({ promotion_pending: false })
+        .eq('id', user.id);
+    }
+    
+    setShowLevelQRModal(false);
+    setLevelQRCodeUrl('');
+    setLevelQRCodeContent('');
+    setLevelQRCodeId('');
+    setTargetLevel(1);
+  };
+  
+  // 处理等级提升验证确认
+  const handleLevelVerifyConfirm = async (confirm: boolean) => {
+    setShowLevelVerifyConfirm(false);
+    
+    if (!confirm || !user || !scannedLevelData.userId) {
+      return;
+    }
+    
+    try {
+      const { userId, currentLevel, targetLevel, qrCodeId } = scannedLevelData;
+      
+      // 完成等级提升验证
+      const result = await completeLevelPromotion(qrCodeId, userId, user.id, currentLevel, targetLevel);
+      if (result.ok) {
+        alert(`等级提升验证成功！用户已晋升为第 ${targetLevel} 境织梦人`);
+      } else {
+        alert(`等级提升验证失败: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('完成等级提升验证失败:', error);
+      alert('完成等级提升验证失败，请重试');
     }
   };
 
@@ -368,23 +466,49 @@ const App: React.FC = () => {
     
     // 检查是否是师傅
     if (user.is_master) {
-      // 师傅扫描二维码，验证任务
-      try {
-        const verifyResult = await verifyQuestQRCode(data);
-        if (verifyResult.ok) {
-          // 保存扫描结果
-          setScannedQRCodeContent(data);
-          setScannedQuestId(verifyResult.questId || '');
-          setScannedUserId(verifyResult.userId || '');
-          setScannedQRCodeId(verifyResult.qrCodeId || '');
-          // 弹出二次确认框
-          setShowVerifyConfirm(true);
-        } else {
-          alert(`二维码验证失败: ${verifyResult.error}`);
+      // 检查二维码类型
+      const isLevelQRCode = data.startsWith('jws:level:');
+      
+      if (isLevelQRCode) {
+        // 师傅扫描等级提升二维码
+        try {
+          const verifyResult = await verifyLevelQRCode(data);
+          if (verifyResult.ok) {
+            // 保存扫描结果
+            setScannedLevelData({
+              userId: verifyResult.userId || '',
+              currentLevel: verifyResult.currentLevel || 0,
+              targetLevel: verifyResult.targetLevel || 0,
+              qrCodeId: verifyResult.qrCodeId || ''
+            });
+            // 弹出二次确认框
+            setShowLevelVerifyConfirm(true);
+          } else {
+            alert(`等级提升二维码验证失败: ${verifyResult.error}`);
+          }
+        } catch (error) {
+          console.error('验证等级提升二维码失败:', error);
+          alert('验证等级提升二维码失败，请重试');
         }
-      } catch (error) {
-        console.error('验证二维码失败:', error);
-        alert('验证二维码失败，请重试');
+      } else {
+        // 师傅扫描任务二维码，验证任务
+        try {
+          const verifyResult = await verifyQuestQRCode(data);
+          if (verifyResult.ok) {
+            // 保存扫描结果
+            setScannedQRCodeContent(data);
+            setScannedQuestId(verifyResult.questId || '');
+            setScannedUserId(verifyResult.userId || '');
+            setScannedQRCodeId(verifyResult.qrCodeId || '');
+            // 弹出二次确认框
+            setShowVerifyConfirm(true);
+          } else {
+            alert(`二维码验证失败: ${verifyResult.error}`);
+          }
+        } catch (error) {
+          console.error('验证二维码失败:', error);
+          alert('验证二维码失败，请重试');
+        }
       }
     } else if (pendingQuest) {
       // 普通用户完成任务
@@ -766,6 +890,121 @@ const App: React.FC = () => {
             onScan={handleScanSuccess} 
             onClose={() => setShowScanner(false)} 
           />
+        )}
+        
+        {/* 等级提升二维码模态框 */}
+        {showLevelQRModal && (
+          <motion.div 
+            key="level-qr-modal"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-slate-900/90 flex items-center justify-center p-8 backdrop-blur-md"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="bg-white w-full max-w-xs rounded-[2.5rem] p-8 flex flex-col items-center text-center shadow-2xl space-y-6 relative overflow-hidden"
+            >
+              {/* Decorative background element */}
+              <div className="absolute -top-10 -right-10 w-32 h-32 bg-rose-50 rounded-full blur-3xl opacity-50"></div>
+
+              <div className="space-y-3 z-10">
+                <motion.div
+                  initial={{ rotate: -15 }}
+                  animate={{ rotate: 15 }}
+                  transition={{ repeat: Infinity, duration: 2, repeatType: "reverse", ease: "easeInOut" }}
+                  className="text-4xl mb-2"
+                >
+                  🧶
+                </motion.div>
+                <div className="space-y-1">
+                  <h3 className="text-xl font-black text-slate-800 italic">等级提升验证</h3>
+                  <p className="text-[10px] text-slate-400 uppercase tracking-widest">Level Promotion</p>
+                </div>
+              </div>
+
+              <div className="bg-slate-50 p-4 rounded-3xl border-2 border-dashed border-slate-200 w-full z-10">
+                 <p className="text-[10px] font-black text-slate-300 uppercase mb-2">提升信息</p>
+                 <p className="text-sm font-bold text-slate-700">当前等级: {user?.level || 1} → 目标等级: {targetLevel}</p>
+              </div>
+
+              {/* Level QR Code */}
+              <div className="p-4 bg-white border-4 border-slate-100 rounded-3xl shadow-inner relative group z-10 flex items-center justify-center">
+                <img 
+                  src={levelQRCodeUrl} 
+                  alt="等级提升验证二维码" 
+                  className="w-48 h-48 object-contain"
+                />
+                <motion.div 
+                  animate={{ opacity: [0.3, 0.6, 0.3] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                  className="absolute inset-0 flex items-center justify-center"
+                >
+                   <span className="text-4xl">✨</span>
+                </motion.div>
+              </div>
+
+              <div className="space-y-3 z-10">
+                <p className="text-[10px] text-slate-400 font-serif italic">请展示给师傅核验</p>
+                <div className="flex items-center justify-center gap-1">
+                   <span className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse"></span>
+                   <span className="text-[9px] font-bold text-amber-600 uppercase tracking-tighter">等待师傅法力接入...</span>
+                </div>
+              </div>
+
+              <div className="w-full flex flex-col gap-2 pt-2 z-10">
+                <button 
+                  onClick={handleLevelQRCancel}
+                  className="w-full py-3 border border-slate-200 text-slate-400 rounded-xl font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all"
+                >
+                  取消提升 (返回)
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+        
+        {/* 等级提升验证确认模态框 */}
+        {showLevelVerifyConfirm && (
+          <motion.div 
+            key="level-verify-confirm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-slate-900/90 flex items-center justify-center p-8 backdrop-blur-md"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="bg-white w-full max-w-xs rounded-[2.5rem] p-8 flex flex-col items-center text-center shadow-2xl space-y-6 relative overflow-hidden"
+            >
+              <div className="space-y-3 z-10">
+                <div className="text-4xl mb-2">⚡</div>
+                <h3 className="text-xl font-black text-slate-800">等级提升验证</h3>
+                <p className="text-sm text-slate-600">确认为该用户提升等级吗？</p>
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 w-full text-left">
+                  <p className="text-sm font-bold">当前等级: {scannedLevelData.currentLevel}</p>
+                  <p className="text-sm font-bold">目标等级: {scannedLevelData.targetLevel}</p>
+                </div>
+              </div>
+
+              <div className="w-full flex flex-col gap-3 pt-2 z-10">
+                <button 
+                  onClick={() => handleLevelVerifyConfirm(true)}
+                  className="w-full py-3 bg-rose-500 text-white rounded-xl font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all"
+                >
+                  确认提升
+                </button>
+                <button 
+                  onClick={() => handleLevelVerifyConfirm(false)}
+                  className="w-full py-3 border border-slate-200 text-slate-400 rounded-xl font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all"
+                >
+                  取消
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
         {user?.is_master && (
           <motion.div 
