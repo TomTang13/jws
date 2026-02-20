@@ -551,7 +551,8 @@ export async function checkLevelPromotionStatus(
   userId: string
 ): Promise<boolean> {
   try {
-    const { data: qrCodes, error } = await supabase
+    // 首先检查 level_qr_codes 表中是否有已验证的二维码
+    const { data: qrCodes, error: qrError } = await supabase
       .from('level_qr_codes')
       .select('*')
       .eq('user_id', userId)
@@ -559,11 +560,24 @@ export async function checkLevelPromotionStatus(
       .order('generated_at', { ascending: false })
       .limit(1);
     
-    if (error || !qrCodes || qrCodes.length === 0) {
+    if (qrError || !qrCodes || qrCodes.length === 0) {
       return false;
     }
     
-    return qrCodes[0].verified_at !== null;
+    // 然后检查 profiles 表中的等级是否已经更新
+    const { data: user, error: userError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+    
+    if (userError || !user) {
+      return false;
+    }
+    
+    // 检查用户的 promotion_pending 状态是否为 false
+    // 这表示等级提升已经完成
+    return !user.promotion_pending;
   } catch (error) {
     console.error('检查等级提升状态失败:', error);
     return false;

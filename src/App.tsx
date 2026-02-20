@@ -86,29 +86,51 @@ const App: React.FC = () => {
     if (showLevelQRModal && user) {
       const checkInterval = setInterval(async () => {
         try {
+          console.log('检查等级提升状态...');
           const isPromoted = await checkLevelPromotionStatus(user.id);
+          console.log('等级提升状态检查结果:', isPromoted);
+          
           if (isPromoted) {
             // 等级提升已验证，重新加载用户数据
-            const { data: updatedUser } = await supabase
+            console.log('等级提升已验证，重新加载用户数据...');
+            const { data: updatedUser, error: userError } = await supabase
               .from('profiles')
               .select('*')
               .eq('id', user.id)
               .single();
             
+            if (userError) {
+              console.error('获取更新后的用户数据失败:', userError);
+              return;
+            }
+            
             if (updatedUser) {
+              console.log('获取更新后的用户数据成功:', {
+                level: updatedUser.level,
+                current_level: updatedUser.current_level,
+                promotion_pending: updatedUser.promotion_pending
+              });
+              
+              // 更新用户状态
               setUser(updatedUser);
+              
+              // 关闭等级提升二维码模态框
               setShowLevelQRModal(false);
               setLevelQRCodeUrl('');
               setLevelQRCodeContent('');
               setLevelQRCodeId('');
               setTargetLevel(1);
+              
+              // 显示等级提升成功提示
               alert(`等级提升成功！您现在是第 ${updatedUser.level} 境织梦人`);
+              
+              console.log('等级提升流程完成，UI 已跳转回主界面');
             }
           }
         } catch (error) {
           console.error('检查等级提升状态失败:', error);
         }
-      }, 3000);
+      }, 2000); // 缩短检查间隔，提高响应速度
       
       return () => clearInterval(checkInterval);
     }
