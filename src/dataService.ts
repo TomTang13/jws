@@ -504,42 +504,26 @@ export async function completeLevelPromotion(
   targetLevel: number
 ): Promise<{ ok: boolean; error?: string }> {
   try {
-    // 1. 更新二维码状态
-    const updateStatusResult = await updateLevelQRCodeStatus(qrCodeId);
-    if (!updateStatusResult.ok) {
-      return updateStatusResult;
+    // 使用存储过程完成等级提升，绕过RLS权限检查
+    const { data, error } = await supabase
+      .rpc('complete_level_promotion', {
+        p_qr_code_id: qrCodeId,
+        p_user_id: userId,
+        p_master_id: masterId,
+        p_current_level: currentLevel,
+        p_target_level: targetLevel
+      });
+    
+    if (error) {
+      console.error('完成等级提升验证失败:', error);
+      return { ok: false, error: error.message || '完成等级提升验证失败' };
     }
     
-    // 2. 创建等级提升记录
-    const { data: levelLog, error: logError } = await supabase
-      .from('level_logs')
-      .insert({
-        user_id: userId,
-        old_level: currentLevel,
-        new_level: targetLevel,
-        verified_by: masterId,
-        qr_code_id: qrCodeId,
-        status: 'verified'
-      })
-      .select('id')
-      .single();
-    
-    if (logError) {
-      throw logError;
+    if (data && data.ok) {
+      return { ok: true };
+    } else {
+      return { ok: false, error: data?.error || '等级提升失败' };
     }
-    
-    // 3. 更新用户等级
-    await supabase
-      .from('profiles')
-      .update({
-        level: targetLevel,
-        current_level: targetLevel,
-        promotion_pending: false,
-        last_promotion_at: new Date().toISOString()
-      })
-      .eq('id', userId);
-    
-    return { ok: true };
   } catch (error) {
     console.error('完成等级提升验证失败:', error);
     return { ok: false, error: '完成等级提升验证失败' };
@@ -548,39 +532,23 @@ export async function completeLevelPromotion(
 
 // 检查等级提升状态
 export async function checkLevelPromotionStatus(
-  userId: string
+  qrCodeId: string
 ): Promise<boolean> {
   try {
-    // 首先检查 level_qr_codes 表中是否有已验证的二维码
-    const { data: qrCodes, error: qrError } = await supabase
-      .from('level_qr_codes')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('status', 'verified')
-      .order('generated_at', { ascending: false })
-      .limit(1);
+    // 使用存储过程检查等级提升状态，绕过RLS权限检查
+    // 现在只根据二维码状态判断验证是否成功
+    const { data, error } = await supabase
+      .rpc('check_level_promotion_status', {
+        p_qr_code_id: qrCodeId
+      });
     
-    if (qrError || !qrCodes || qrCodes.length === 0) {
+    if (error) {
+      console.error('检查等级提升状态失败:', error);
       return false;
     }
     
-    const latestQRCode = qrCodes[0];
-    
-    // 然后检查 profiles 表中的等级是否已经更新
-    const { data: user, error: userError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-    
-    if (userError || !user) {
-      return false;
-    }
-    
-    // 检查用户的 promotion_pending 状态是否为 false
-    // 并且检查用户的等级是否已经更新到目标等级
-    // 这表示等级提升已经完成
-    return !user.promotion_pending && user.level >= latestQRCode.target_level;
+    // 检查返回状态是否为已验证
+    return data && data.status === 'verified';
   } catch (error) {
     console.error('检查等级提升状态失败:', error);
     return false;
