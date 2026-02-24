@@ -983,7 +983,7 @@ const App: React.FC = () => {
                 <p className="text-[10px] text-slate-400 font-serif italic">请展示给师傅核验</p>
                 <div className="flex items-center justify-center gap-1">
                    <span className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse"></span>
-                   <span className="text-[9px] font-bold text-amber-600 uppercase tracking-tighter">等待师傅法力接入...</span>
+                   <span className="text-[9px] font-bold text-amber-600 uppercase tracking-tighter">等待师傅验收...</span>
                 </div>
               </div>
 
