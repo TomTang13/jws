@@ -55,6 +55,7 @@ export interface Quest {
   type: QuestType;
   categoryName: string;  
   purpose?: string;
+  needs_verification?: boolean;
 }
 
 export interface ShopItem {
