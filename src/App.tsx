@@ -447,21 +447,31 @@ const App: React.FC = () => {
       return;
     }
     
-    // 生成任务二维码
-    try {
-      const { qrCodeUrl, qrCodeContent, qrCodeId } = await generateQuestQRCode(questId, user.id);
-      setQrCodeUrl(qrCodeUrl);
-      setQrCodeContent(qrCodeContent);
-      setQrCodeId(qrCodeId);
-    } catch (error) {
-      console.error('生成二维码失败:', error);
-      // 如果生成二维码失败，使用默认值
-      setQrCodeUrl('https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=jws:quest:error');
-      setQrCodeContent('jws:quest:error');
-      setQrCodeId('');
-    }
+    // 检查任务是否需要师傅验证
+    // 这里假设quest对象包含needs_verification属性
+    // 如果没有该属性，默认需要验证
+    const needsVerification = quest.needs_verification !== false;
     
-    setPendingQuest(quest);
+    if (needsVerification) {
+      // 需要师傅验证，生成任务二维码
+      try {
+        const { qrCodeUrl, qrCodeContent, qrCodeId } = await generateQuestQRCode(questId, user.id);
+        setQrCodeUrl(qrCodeUrl);
+        setQrCodeContent(qrCodeContent);
+        setQrCodeId(qrCodeId);
+      } catch (error) {
+        console.error('生成二维码失败:', error);
+        // 如果生成二维码失败，使用默认值
+        setQrCodeUrl('https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=jws:quest:error');
+        setQrCodeContent('jws:quest:error');
+        setQrCodeId('');
+      }
+      
+      setPendingQuest(quest);
+    } else {
+      // 不需要师傅验证，直接完成任务
+      await finalizeQuest(quest);
+    }
   };
 
   const finalizeQuest = async (questToComplete: Quest) => {

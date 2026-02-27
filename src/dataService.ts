@@ -95,7 +95,8 @@ export async function getQuests(type: 'daily' | 'labor' | 'patron'): Promise<Que
     cost: q.cost_coins,
     type: typeMap[q.category] || 'daily',
     categoryName: type === 'daily' ? '今日心情' : type === 'labor' ? '工坊清单' : '限定通告',
-    purpose: ''
+    purpose: '',
+    needs_verification: q.needs_verification
   }));
 }
 
