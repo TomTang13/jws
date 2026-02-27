@@ -18,18 +18,18 @@ export const LEVELS: LevelConfig[] = [
 ];
 
 export const QUESTS: Quest[] = [
-  // 今日心情 (Daily) - 不需要验证
-  { id: 'd1', type: 'daily', categoryName: '今日心情', targetLv: 1, title: '晨钟签到', description: '今天天气真好，来前台签个到，留下你的手印吧~', ycReward: 10, insReward: 5, rewardText: '10 织梦币', purpose: '打卡习惯', needs_verification: false },
-  { id: 'd2', type: 'daily', categoryName: '今日心情', targetLv: 1, title: '织梦分享', description: '把桌面的线头清理干净，拍下美照分享心情。', ycReward: 30, insReward: 20, rewardText: '30 织梦币', purpose: '环境与社交', needs_verification: false },
+  // 今日心情 (Daily)
+  { id: 'd1', type: 'daily', categoryName: '今日心情', targetLv: 1, title: '晨钟签到', description: '今天天气真好，来前台签个到，留下你的手印吧~', ycReward: 10, insReward: 5, rewardText: '10 织梦币', purpose: '打卡习惯' },
+  { id: 'd2', type: 'daily', categoryName: '今日心情', targetLv: 1, title: '织梦分享', description: '把桌面的线头清理干净，拍下美照分享心情。', ycReward: 30, insReward: 20, rewardText: '30 织梦币', purpose: '环境与社交' },
   
-  // 工坊清单 (Artisan/Labor) - 需要验证
-  { id: 'l1', type: 'labor', categoryName: '工坊清单', targetLv: 1, title: '学徒绕线', description: '帮工坊绕线 1 小时。工坊的繁荣离不开你的勤勉。', ycReward: 50, insReward: 100, rewardText: '100 灵感', purpose: '工匠流', needs_verification: true },
-  { id: 'l2', type: 'labor', categoryName: '工坊清单', targetLv: 2, title: '草莓叶愿望', description: '制作 10 片绿色的草莓叶子。工坊需要它们装点作品。', ycReward: 100, insReward: 300, rewardText: '300 灵感 + 100 织梦币', purpose: '半成品储备', needs_verification: true },
-  { id: 'l3', type: 'labor', categoryName: '工坊清单', targetLv: 3, title: '素体养成', description: '制作 20 个玩偶头部（白球）。这是店里最缺的基础。', ycReward: 300, insReward: 800, rewardText: '800 灵感 + 300 织梦币', purpose: '核心组件', needs_verification: true },
+  // 工坊清单 (Artisan/Labor)
+  { id: 'l1', type: 'labor', categoryName: '工坊清单', targetLv: 1, title: '学徒绕线', description: '帮工坊绕线 1 小时。工坊的繁荣离不开你的勤勉。', ycReward: 50, insReward: 100, rewardText: '100 灵感', purpose: '工匠流' },
+  { id: 'l2', type: 'labor', categoryName: '工坊清单', targetLv: 2, title: '草莓叶愿望', description: '制作 10 片绿色的草莓叶子。工坊需要它们装点作品。', ycReward: 100, insReward: 300, rewardText: '300 灵感 + 100 织梦币', purpose: '半成品储备' },
+  { id: 'l3', type: 'labor', categoryName: '工坊清单', targetLv: 3, title: '素体养成', description: '制作 20 个玩偶头部（白球）。这是店里最缺的基础。', ycReward: 300, insReward: 800, rewardText: '800 灵感 + 300 织梦币', purpose: '核心组件' },
   
-  // 限定通告 (Collector/Patron) - 不需要验证
-  { id: 'p1', type: 'patron', categoryName: '限定通告', targetLv: 1, title: '初遇礼包', description: '购买精选新手材料礼包，瞬间点亮创意。', ycReward: 0, insReward: 100, cost: 168, rewardText: '100 灵感', purpose: '收藏家', needs_verification: false },
-  { id: 'p2', type: 'patron', categoryName: '限定通告', targetLv: 4, title: '闺蜜下午茶', description: '邀请一位新朋友完成体验课，共享织梦时光。', ycReward: 500, insReward: 1000, rewardText: '1000 灵感 + 500 织梦币', purpose: '社交裂变', needs_verification: false }
+  // 限定通告 (Collector/Patron)
+  { id: 'p1', type: 'patron', categoryName: '限定通告', targetLv: 1, title: '初遇礼包', description: '购买精选新手材料礼包，瞬间点亮创意。', ycReward: 0, insReward: 100, cost: 168, rewardText: '100 灵感', purpose: '收藏家' },
+  { id: 'p2', type: 'patron', categoryName: '限定通告', targetLv: 4, title: '闺蜜下午茶', description: '邀请一位新朋友完成体验课，共享织梦时光。', ycReward: 500, insReward: 1000, rewardText: '1000 灵感 + 500 织梦币', purpose: '社交裂变' }
 ];
 
 export const SKILL_PATHS: SkillPath[] = [
