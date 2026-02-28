@@ -123,20 +123,19 @@ export async function getShopItems(): Promise<ShopItem[]> {
 }
 
 // 获取用户已完成任务
-export async function getUserCompletedQuests(userId: string): Promise<string[]> {
+export async function getUserCompletedQuests(userId: string, quests: any[]): Promise<string[]> {
   try {
-    const { data, error } = await supabase
-      .from('user_quests')
-      .select('quest_template_id')
-      .eq('user_id', userId)
-      .eq('status', 'completed');
+    const completedQuests = [];
     
-    if (error) {
-      console.error('获取已完成任务失败:', error);
-      return [];
+    // 对于每个任务，检查其完成状态
+    for (const quest of quests) {
+      const isCompleted = await isQuestCompleted(userId, quest.id, quest.type);
+      if (isCompleted) {
+        completedQuests.push(quest.id);
+      }
     }
     
-    return data?.map(q => q.quest_template_id) || [];
+    return completedQuests;
   } catch (error) {
     console.error('获取已完成任务失败:', error);
     return [];
@@ -144,25 +143,12 @@ export async function getUserCompletedQuests(userId: string): Promise<string[]> 
 }
 
 // 检查特定任务的状态
-export async function checkQuestStatus(userId: string, questId: string): Promise<boolean> {
+export async function checkQuestStatus(userId: string, questId: string, questType: string): Promise<boolean> {
   try {
-    console.log('Checking quest status with:', { userId, questId });
+    console.log('Checking quest status with:', { userId, questId, questType });
     
-    // 检查 user_quests 表中是否有已完成的任务记录
-    const { data: userQuestData, error: userQuestError } = await supabase
-      .from('user_quests')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('quest_template_id', questId)
-      .eq('status', 'completed');
-    
-    if (userQuestError) {
-      console.error('Supabase error checking user_quests:', userQuestError);
-      return false;
-    }
-    
-    console.log('Quest status check data (user_quests):', userQuestData);
-    return userQuestData && userQuestData.length > 0;
+    // 直接调用isQuestCompleted函数，复用相同的逻辑
+    return await isQuestCompleted(userId, questId, questType);
   } catch (error) {
     console.error('Error checking quest status:', error);
     return false;
@@ -208,13 +194,15 @@ export async function updateUserProgress(
 export async function addQuestRecord(
   userId: string, 
   questId: string,
-  qrCodeId: string
+  qrCodeId: string,
+  questType: string
 ) {
   const { error } = await supabase
     .rpc('add_quest_record', {
       p_user_id: userId,
       p_quest_id: questId,
-      p_qr_code_id: qrCodeId
+      p_qr_code_id: qrCodeId,
+      p_quest_type: questType
     });
   
   return { error };
@@ -377,17 +365,35 @@ export async function updateQuestQRCodeStatus(
 // 检查任务是否已完成
 export async function isQuestCompleted(
   userId: string,
-  questId: string
+  questId: string,
+  questType: string
 ): Promise<boolean> {
   try {
-    const { data } = await supabase
-      .from('user_quests')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('quest_template_id', questId)
-      .eq('status', 'completed');
-    
-    return data && data.length > 0;
+    if (questType === 'daily') {
+      // 对于daily任务，检查当天是否已完成
+      const { data, error } = await supabase
+        .rpc('is_daily_quest_completed_today', {
+          p_user_id: userId,
+          p_quest_id: questId
+        });
+      
+      if (error) {
+        console.error('检查daily任务状态失败:', error);
+        return false;
+      }
+      
+      return data || false;
+    } else {
+      // 对于非daily任务，保持原有逻辑
+      const { data } = await supabase
+        .from('user_quests')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('quest_template_id', questId)
+        .eq('status', 'completed');
+      
+      return data && data.length > 0;
+    }
   } catch (error) {
     console.error('检查任务状态失败:', error);
     return false;

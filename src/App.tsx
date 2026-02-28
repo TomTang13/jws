@@ -174,12 +174,21 @@ const App: React.FC = () => {
   }
 
   async function loadUserData(userId: string) {
-    const [completed, inventory, userData] = await Promise.all([
-      getUserCompletedQuests(userId),
+    const [inventory, userData] = await Promise.all([
       getUserInventory(userId),
       getUserData(userId)
     ]);
-    setCompletedQuests(completed);
+    
+    // 对于每个任务，检查其完成状态
+    const completedQuests = [];
+    for (const quest of quests) {
+      const isCompleted = await isQuestCompleted(userId, quest.id, quest.type);
+      if (isCompleted) {
+        completedQuests.push(quest.id);
+      }
+    }
+    
+    setCompletedQuests(completedQuests);
     setUserInventory(inventory);
     // 更新用户基本信息，包括织梦币和灵感值
     if (userData) {
@@ -481,7 +490,7 @@ const App: React.FC = () => {
     setCompletedQuests(prev => [...prev, questToComplete.id]);
     
     // 更新数据库
-    await addQuestRecord(user.id, questToComplete.id, qrCodeId);
+    await addQuestRecord(user.id, questToComplete.id, qrCodeId, questToComplete.type);
     await updateProfile({
       coins: (user.coins || 0) - (questToComplete.cost || 0),
       yc: (user.yc || 0) + questToComplete.ycReward,
@@ -619,7 +628,10 @@ const App: React.FC = () => {
       }
       
       // 添加任务完成记录
-      const addQuestResult = await addQuestRecord(scannedUserId, scannedQuestId, scannedQRCodeId);
+      // 从quests数组中查找任务类型
+      const quest = quests.find(q => q.id === scannedQuestId);
+      const questType = quest?.type || 'daily';
+      const addQuestResult = await addQuestRecord(scannedUserId, scannedQuestId, scannedQRCodeId, questType);
       if (addQuestResult.error) {
         console.error('添加任务记录失败:', addQuestResult.error);
         alert('添加任务记录失败，请重试');
