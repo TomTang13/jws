@@ -23,7 +23,7 @@ export const QRModal: React.FC<QRModalProps> = ({ quest, qrCodeUrl, qrCodeConten
     const checkInterval = setInterval(async () => {
       try {
         console.log('Checking quest status...');
-        const isCompleted = await checkQuestStatus(userId, quest.id);
+        const isCompleted = await checkQuestStatus(userId, quest.id, quest.type);
         console.log('Quest status check result:', isCompleted);
         if (isCompleted) {
           // Clear the interval before completing the process

@@ -74,7 +74,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onAutoLogin, 
       }
       if (!data) {
         console.error('[validateToken] 未找到邀请码记录:', trimmed);
-        setLoginError('无效的邀请码（请确认该密钥已在后台 pre_users 表中录入）');
+        setLoginError('无效的邀请码');
+        setAct(6);
         setValidating(false);
         return;
       }
@@ -119,6 +120,34 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onAutoLogin, 
     }
   }, [isPressing, act]);
 
+  // 检查昵称是否已存在（带超时处理）
+  const checkNicknameExists = async (nickname: string) => {
+    try {
+      // 创建一个AbortController来处理超时
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5秒超时
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('nickname', nickname.trim())
+        .maybeSingle()
+        .abortSignal(controller.signal);
+      
+      clearTimeout(timeoutId);
+      
+      if (error) {
+        console.error('检查昵称失败:', error);
+        return false;
+      }
+      
+      return !!data;
+    } catch (error) {
+      console.error('检查昵称异常:', error);
+      return false;
+    }
+  };
+
   const handleSubmit = async () => {
     console.log('[LandingPage] 提交表单，用户输入的昵称:', name);
     if (!name.trim()) {
@@ -129,6 +158,33 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onAutoLogin, 
       setLoginError('邀请码无效');
       return;
     }
+    
+    // 检查昵称是否已存在
+    const nicknameExists = await checkNicknameExists(name);
+    if (nicknameExists) {
+      setLoginError('该昵称已被使用，请重新输入');
+      return;
+    }
+    
+    // 将昵称写入 pre_users 的 notes 字段
+    try {
+      console.log('[LandingPage] 将昵称写入 pre_users.notes:', name.trim());
+      const { error } = await supabase
+        .from('pre_users')
+        .update({ notes: name.trim() })
+        .eq('id', preUserId);
+      
+      if (error) {
+        console.error('更新 pre_users.notes 失败:', error);
+        // 继续执行，不阻止登录流程
+      } else {
+        console.log('更新 pre_users.notes 成功');
+      }
+    } catch (error) {
+      console.error('更新 pre_users.notes 异常:', error);
+      // 继续执行，不阻止登录流程
+    }
+    
     setLoginError('');
     console.log('[LandingPage] 调用 onLogin，传递昵称:', name.trim());
     const success = await onLogin(name.trim(), preUserId);
@@ -270,6 +326,27 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onAutoLogin, 
           >
             明日再来
           </motion.button>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // 阶段6：无效邀请码
+  if (act === 6) {
+    return (
+      <div className="fixed inset-0 z-[100] bg-[#fdfbf7] flex flex-col items-center justify-center p-8 overflow-hidden paper-texture">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5 }}
+          className="text-center space-y-8"
+        >
+          <div className="text-8xl opacity-80">📜</div>
+          <h2 className="text-2xl font-black text-slate-800 italic">未获得邀请</h2>
+          <p className="text-sm font-serif text-slate-600 max-w-xs">
+            您还未获得织梦手记的邀请。
+            请联系工坊主理人获取邀请码。
+          </p>
         </motion.div>
       </div>
     );
