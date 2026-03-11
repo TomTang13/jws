@@ -629,7 +629,6 @@ const App: React.FC = () => {
       
       // 添加任务完成记录
       // 从quests数组中查找任务类型
-      const quest = quests.find(q => q.id === scannedQuestId);
       const questType = quest?.type || 'daily';
       const addQuestResult = await addQuestRecord(scannedUserId, scannedQuestId, scannedQRCodeId, questType);
       if (addQuestResult.error) {
