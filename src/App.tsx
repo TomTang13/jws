@@ -362,13 +362,15 @@ const App: React.FC = () => {
 
       // 登录成功
       console.log('[handleAutoLogin] 登录成功，加载用户数据...');
-      sessionStorage.removeItem('jws_invite_token');
-      setInviteToken(null);
       // 更新登录次数状态
       setDailyLoginCount(loginCheckResult.dailyLoginCount || 1);
       setDailyLoginLimit(loginCheckResult.dailyLoginLimit || 5);
       await loadUserData(profile.id);
       setUser(profile);
+
+      // 数据加载并渲染后再清空 token，防止中间状态跳出 WaitingPage(机缘未止) 界面
+      sessionStorage.removeItem('jws_invite_token');
+      setInviteToken(null);
       console.log('[handleAutoLogin] 自动登录流程完成');
       return {
         ok: true,
