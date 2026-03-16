@@ -819,7 +819,7 @@ const App: React.FC = () => {
             </div>
             <div className="space-y-6">
               {quests
-                .filter(q => q.type === questSubTab)
+                .filter(q => q.type === questSubTab && q.targetLv <= (user?.level || 1) + 1)
                 .sort((a, b) => {
                   const getRank = (q: any) => {
                     if (completedQuests.includes(q.id)) return 3;
