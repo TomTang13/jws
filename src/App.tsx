@@ -63,14 +63,14 @@ const App: React.FC = () => {
       setIsConnected(connected);
 
       if (connected) {
-        // 加载数据
-        await loadData();
+        // 加载数据，拿到真实的 DB quests（含 UUID）
+        const loadedQuests = await loadData();
 
-        // 监听登录状态
+        // 监听登录状态，把 loadedQuests 直接传入，避免用闭包里的旧常量
         onAuthChange(async (profile) => {
           setUser(profile);
           if (profile) {
-            await loadUserData(profile.id);
+            await loadUserData(profile.id, loadedQuests);
           }
         });
       }
@@ -148,7 +148,7 @@ const App: React.FC = () => {
     }
   }, [showLevelQRModal, user, levelQRCodeId]);
 
-  async function loadData() {
+  async function loadData(): Promise<Quest[]> {
     try {
       // 加载等级
       const levelData = await getLevels();
@@ -168,20 +168,31 @@ const App: React.FC = () => {
       // 加载商店
       const shopData = await getShopItems();
       if (shopData.length > 0) setShopItems(shopData);
+
+      // 返回真实的 DB quests，供 loadUserData 直接使用（避免 React 状态异步问题）
+      return allQuests;
     } catch (err) {
       console.error('加载数据失败:', err);
+      return [];
     }
   }
 
-  async function loadUserData(userId: string) {
+  async function loadUserData(userId: string, questList?: Quest[]) {
     const [inventory, userData] = await Promise.all([
       getUserInventory(userId),
       getUserData(userId)
     ]);
 
-    // 对于每个任务，检查其完成状态
+    // 优先用传入的 questList（含真实 UUID），兜底才用 state 里的 quests
+    const questsToCheck = (questList && questList.length > 0) ? questList : quests;
+
+    // 对于每个任务，检查其完成状态（只处理有效 UUID 的任务）
     const completedQuests = [];
-    for (const quest of quests) {
+    for (const quest of questsToCheck) {
+      // 跳过明显不是 UUID 的 ID（如本地常量 d1/d2/l1 等），避免数据库报错
+      const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidPattern.test(quest.id)) continue;
+
       const isCompleted = await isQuestCompleted(userId, quest.id, quest.type);
       if (isCompleted) {
         completedQuests.push(quest.id);
