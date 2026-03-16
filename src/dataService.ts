@@ -387,7 +387,7 @@ export async function isQuestCompleted(
 ): Promise<boolean> {
   try {
     if (questType === 'daily') {
-      // 对于daily任务，检查当天是否已完成任意一个daily任务（每类每天限一次）
+      // 对于daily任务，检查特定任务当天是否已完成（每个 daily 任务每天限一次）
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const todayISO = today.toISOString();
@@ -396,7 +396,7 @@ export async function isQuestCompleted(
         .from('user_quests')
         .select('id')
         .eq('user_id', userId)
-        .eq('quest_type', 'daily') // 检查是否有任何 daily 被完成
+        .eq('quest_template_id', questId) // 改回具体检查这个任务ID
         .eq('status', 'completed')
         .gte('completed_at', todayISO);
 
