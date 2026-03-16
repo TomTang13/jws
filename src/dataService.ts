@@ -155,6 +155,24 @@ export async function checkQuestStatus(userId: string, questId: string, questTyp
   }
 }
 
+// 检查二维码是否已被师傅验证（直接查二维码状态，对所有任务类型通用）
+export async function checkQRCodeVerified(qrCodeId: string): Promise<boolean> {
+  try {
+    if (!qrCodeId) return false;
+    const { data, error } = await supabase
+      .from('quest_qr_codes')
+      .select('status')
+      .eq('id', qrCodeId)
+      .single();
+
+    if (error || !data) return false;
+    return data.status === 'verified';
+  } catch (error) {
+    console.error('检查二维码状态失败:', error);
+    return false;
+  }
+}
+
 // 获取用户背包
 export async function getUserInventory(userId: string): Promise<string[]> {
   const { data } = await supabase
