@@ -68,9 +68,11 @@ const App: React.FC = () => {
 
         // 监听登录状态，把 loadedQuests 直接传入，避免用闭包里的旧常量
         onAuthChange(async (profile) => {
-          setUser(profile);
           if (profile) {
             await loadUserData(profile.id, loadedQuests);
+            setUser(profile);
+          } else {
+            setUser(null);
           }
         });
       }
@@ -240,8 +242,8 @@ const App: React.FC = () => {
       // 注册成功后，手动获取用户档案并更新 user 状态
       const userProfile = await getCurrentUser();
       if (userProfile) {
-        setUser(userProfile);
         await loadUserData(userProfile.id);
+        setUser(userProfile);
 
         // 记录登录历史
         console.log('[handleLogin] 登录成功，记录登录历史...');
@@ -362,11 +364,11 @@ const App: React.FC = () => {
       console.log('[handleAutoLogin] 登录成功，加载用户数据...');
       sessionStorage.removeItem('jws_invite_token');
       setInviteToken(null);
-      setUser(profile);
       // 更新登录次数状态
       setDailyLoginCount(loginCheckResult.dailyLoginCount || 1);
       setDailyLoginLimit(loginCheckResult.dailyLoginLimit || 5);
       await loadUserData(profile.id);
+      setUser(profile);
       console.log('[handleAutoLogin] 自动登录流程完成');
       return {
         ok: true,
