@@ -698,7 +698,7 @@ const App: React.FC = () => {
         <div className="text-center">
           <div className="text-4xl mb-4">🧶</div>
           <p className="text-slate-600 font-serif">正在连接织梦手记...</p>
-          {!isConnected && <p className="text-xs text-amber-500 mt-2">演示模式</p>}
+          {!isConnected && <p className="text-xs text-amber-500 mt-2">正在连接中</p>}
         </div>
       </div>
     );
