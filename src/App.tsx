@@ -68,9 +68,11 @@ const App: React.FC = () => {
 
         // 监听登录状态，把 loadedQuests 直接传入，避免用闭包里的旧常量
         onAuthChange(async (profile) => {
-          setUser(profile);
           if (profile) {
             await loadUserData(profile.id, loadedQuests);
+            setUser(profile);
+          } else {
+            setUser(null);
           }
         });
       }
@@ -240,8 +242,8 @@ const App: React.FC = () => {
       // 注册成功后，手动获取用户档案并更新 user 状态
       const userProfile = await getCurrentUser();
       if (userProfile) {
-        setUser(userProfile);
         await loadUserData(userProfile.id);
+        setUser(userProfile);
 
         // 记录登录历史
         console.log('[handleLogin] 登录成功，记录登录历史...');
@@ -362,11 +364,11 @@ const App: React.FC = () => {
       console.log('[handleAutoLogin] 登录成功，加载用户数据...');
       sessionStorage.removeItem('jws_invite_token');
       setInviteToken(null);
-      setUser(profile);
       // 更新登录次数状态
       setDailyLoginCount(loginCheckResult.dailyLoginCount || 1);
       setDailyLoginLimit(loginCheckResult.dailyLoginLimit || 5);
       await loadUserData(profile.id);
+      setUser(profile);
       console.log('[handleAutoLogin] 自动登录流程完成');
       return {
         ok: true,
@@ -952,8 +954,19 @@ const App: React.FC = () => {
             }}
             onSimulateVerify={() => finalizeQuest(pendingQuest)}
             onQuestCompleted={() => {
-              // 关闭弹窗并重新加载用户数据
+              // 1. 乐观更新：立刻将该任务置为已完成，防止接口网络延迟期间徒弟抢按第二次
+              if (pendingQuest) {
+                setCompletedQuests(prev => {
+                  if (!prev.includes(pendingQuest.id)) {
+                    return [...prev, pendingQuest.id];
+                  }
+                  return prev;
+                });
+              }
+              // 2. 关闭弹窗
               setPendingQuest(null);
+
+              // 3. 异步重新拉取后台确认数据
               if (user) {
                 // 必须传入 quests 避免闭包捕获初始化时的常量短 ID
                 loadUserData(user.id, quests).then(() => {
