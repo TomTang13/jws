@@ -954,8 +954,19 @@ const App: React.FC = () => {
             }}
             onSimulateVerify={() => finalizeQuest(pendingQuest)}
             onQuestCompleted={() => {
-              // 关闭弹窗并重新加载用户数据
+              // 1. 乐观更新：立刻将该任务置为已完成，防止接口网络延迟期间徒弟抢按第二次
+              if (pendingQuest) {
+                setCompletedQuests(prev => {
+                  if (!prev.includes(pendingQuest.id)) {
+                    return [...prev, pendingQuest.id];
+                  }
+                  return prev;
+                });
+              }
+              // 2. 关闭弹窗
               setPendingQuest(null);
+
+              // 3. 异步重新拉取后台确认数据
               if (user) {
                 // 必须传入 quests 避免闭包捕获初始化时的常量短 ID
                 loadUserData(user.id, quests).then(() => {
