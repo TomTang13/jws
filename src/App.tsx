@@ -15,18 +15,18 @@ const App: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [inviteToken, setInviteToken] = useState<string | null>(null);
-  
+
   const [user, setUser] = useState<UserProfile | null>(null);
   const [levels, setLevels] = useState(LEVELS);
   const [quests, setQuests] = useState(QUESTS);
   const [shopItems, setShopItems] = useState(GUILD_SHOP);
   const [dailyLoginCount, setDailyLoginCount] = useState<number>(1);
   const [dailyLoginLimit, setDailyLoginLimit] = useState<number>(5);
-  
+
   const [activeTab, setActiveTab] = useState<'map' | 'quests' | 'shop' | 'profile'>('map');
   const [questSubTab, setQuestSubTab] = useState<'daily' | 'labor' | 'patron'>('daily');
   const [showAscendModal, setShowAscendModal] = useState(false);
-  
+
   const [pendingQuest, setPendingQuest] = useState<Quest | null>(null);
   const [showScanner, setShowScanner] = useState(false);
   const [completedQuests, setCompletedQuests] = useState<string[]>([]);
@@ -39,7 +39,7 @@ const App: React.FC = () => {
   const [scannedQuestId, setScannedQuestId] = useState<string>('');
   const [scannedUserId, setScannedUserId] = useState<string>('');
   const [scannedQRCodeId, setScannedQRCodeId] = useState<string>('');
-  
+
   // 等级提升相关状态
   const [showLevelQRModal, setShowLevelQRModal] = useState(false);
   const [levelQRCodeUrl, setLevelQRCodeUrl] = useState<string>('');
@@ -56,16 +56,16 @@ const App: React.FC = () => {
     if (token) {
       setInviteToken(token);
     }
-    
+
     async function init() {
       // 测试 Supabase 连接
       const connected = await testConnection();
       setIsConnected(connected);
-      
+
       if (connected) {
         // 加载数据
         await loadData();
-        
+
         // 监听登录状态
         onAuthChange(async (profile) => {
           setUser(profile);
@@ -74,13 +74,13 @@ const App: React.FC = () => {
           }
         });
       }
-      
+
       setIsLoading(false);
     }
-    
+
     init();
   }, []);
-  
+
   // 检查等级提升状态
   useEffect(() => {
     if (showLevelQRModal && user && levelQRCodeId) {
@@ -90,11 +90,11 @@ const App: React.FC = () => {
           console.log('使用二维码ID检查:', levelQRCodeId);
           const isPromoted = await checkLevelPromotionStatus(levelQRCodeId);
           console.log('等级提升状态检查结果:', isPromoted);
-          
+
           if (isPromoted) {
             // 清除检查间隔，避免重复检查
             clearInterval(checkInterval);
-            
+
             // 等级提升已验证，重新加载用户数据
             console.log('等级提升已验证，重新加载用户数据...');
             const { data: updatedUser, error: userError } = await supabase
@@ -102,34 +102,34 @@ const App: React.FC = () => {
               .select('*')
               .eq('id', user.id)
               .single();
-            
+
             if (userError) {
               console.error('获取更新后的用户数据失败:', userError);
               return;
             }
-            
+
             if (updatedUser) {
               console.log('获取更新后的用户数据成功:', {
                 level: updatedUser.level,
                 current_level: updatedUser.current_level,
                 promotion_pending: updatedUser.promotion_pending
               });
-              
+
               // 检查等级是否真的提升了
               if (updatedUser.level > user.level) {
                 // 更新用户状态
                 setUser(updatedUser);
-                
+
                 // 关闭等级提升二维码模态框
                 setShowLevelQRModal(false);
                 setLevelQRCodeUrl('');
                 setLevelQRCodeContent('');
                 setLevelQRCodeId('');
                 setTargetLevel(1);
-                
+
                 // 显示等级提升成功提示
                 alert(`等级提升成功！您现在是第 ${updatedUser.level} 境织梦人`);
-                
+
                 console.log('等级提升流程完成，UI 已跳转回主界面');
               } else {
                 console.warn('等级提升状态检查返回true，但用户等级没有提升:', {
@@ -143,7 +143,7 @@ const App: React.FC = () => {
           console.error('检查等级提升状态失败:', error);
         }
       }, 2000); // 缩短检查间隔，提高响应速度
-      
+
       return () => clearInterval(checkInterval);
     }
   }, [showLevelQRModal, user, levelQRCodeId]);
@@ -153,18 +153,18 @@ const App: React.FC = () => {
       // 加载等级
       const levelData = await getLevels();
       if (levelData.length > 0) setLevels(levelData);
-      
+
       // 加载所有类型的任务
       const [dailyQuests, laborQuests, patronQuests] = await Promise.all([
         getQuests('daily'),
         getQuests('labor'),
         getQuests('patron')
       ]);
-      
+
       // 合并所有任务
       const allQuests = [...dailyQuests, ...laborQuests, ...patronQuests];
       if (allQuests.length > 0) setQuests(allQuests);
-      
+
       // 加载商店
       const shopData = await getShopItems();
       if (shopData.length > 0) setShopItems(shopData);
@@ -178,7 +178,7 @@ const App: React.FC = () => {
       getUserInventory(userId),
       getUserData(userId)
     ]);
-    
+
     // 对于每个任务，检查其完成状态
     const completedQuests = [];
     for (const quest of quests) {
@@ -187,7 +187,7 @@ const App: React.FC = () => {
         completedQuests.push(quest.id);
       }
     }
-    
+
     setCompletedQuests(completedQuests);
     setUserInventory(inventory);
     // 更新用户基本信息，包括织梦币和灵感值
@@ -204,7 +204,7 @@ const App: React.FC = () => {
       console.log('[handleLogin] 检查登录次数限制...');
       const loginCheckResult = await checkAndUpdateLoginCount(preUserId);
       console.log('[handleLogin] 登录次数检查结果:', loginCheckResult);
-      
+
       if (!loginCheckResult.success) {
         console.error('[handleLogin] 登录次数检查失败:', loginCheckResult.error || loginCheckResult.message);
         if (loginCheckResult.message === '工坊能量耗尽') {
@@ -215,11 +215,11 @@ const App: React.FC = () => {
         }
         return false;
       }
-      
+
       // 更新登录次数状态
       setDailyLoginCount(loginCheckResult.dailyLoginCount || 1);
       setDailyLoginLimit(loginCheckResult.dailyLoginLimit || 5);
-      
+
       const password = getTokenBasedPassword(preUserId);
       const result = await signUp(nickname, password, preUserId);
       if (result.error) {
@@ -231,7 +231,7 @@ const App: React.FC = () => {
       if (userProfile) {
         setUser(userProfile);
         await loadUserData(userProfile.id);
-        
+
         // 记录登录历史
         console.log('[handleLogin] 登录成功，记录登录历史...');
         await recordLoginHistory(userProfile.id, preUserId, 'success');
@@ -252,17 +252,17 @@ const App: React.FC = () => {
       console.log('[handleAutoLogin] 检查登录次数限制...');
       const loginCheckResult = await checkAndUpdateLoginCount(preUserId);
       console.log('[handleAutoLogin] 登录次数检查结果:', loginCheckResult);
-      
+
       if (!loginCheckResult.success) {
         console.error('[handleAutoLogin] 登录次数检查失败:', loginCheckResult.error || loginCheckResult.message);
-        return { 
-          ok: false, 
+        return {
+          ok: false,
           error: loginCheckResult.message || loginCheckResult.error || '登录检查失败',
           dailyLoginCount: loginCheckResult.dailyLoginCount,
           dailyLoginLimit: loginCheckResult.dailyLoginLimit
         };
       }
-      
+
       // 检查 pre_users 表中是否有对应的记录
       console.log('[handleAutoLogin] 查询 pre_users 表...');
       const { data: preRow, error: preRowError } = await supabase
@@ -270,19 +270,19 @@ const App: React.FC = () => {
         .select('used_by')
         .eq('id', preUserId)
         .single();
-      
+
       console.log('[handleAutoLogin] pre_users 查询结果:', { preRow, preRowError });
-      
+
       if (preRowError) {
         console.error('[handleAutoLogin] pre_users 查询失败:', preRowError);
         return { ok: false, error: `pre_users 查询失败: ${preRowError.message}` };
       }
-      
+
       if (!preRow?.used_by) {
         console.error('[handleAutoLogin] used_by 未填写:', preRow);
         return { ok: false, error: 'pre_users.used_by 未填写。请把该密钥对应的用户 id（profiles 表的 id）填入该行的 used_by 列。' };
       }
-      
+
       // 检查 profiles 表中是否有对应的用户
       console.log('[handleAutoLogin] 查询 profiles 表...');
       const { data: profile, error: profileError } = await supabase
@@ -290,24 +290,24 @@ const App: React.FC = () => {
         .select('*')
         .eq('id', preRow.used_by)
         .single();
-      
+
       console.log('[handleAutoLogin] profiles 查询结果:', { profile, profileError });
-      
+
       if (profileError) {
         console.error('[handleAutoLogin] profiles 查询失败:', profileError);
         return { ok: false, error: `profiles 查询失败: ${profileError.message}` };
       }
-      
+
       if (!profile) {
         console.error('[handleAutoLogin] 未找到关联账号:', preRow.used_by);
         return { ok: false, error: '未找到关联账号：profiles 中不存在 id = ' + preRow.used_by + '，请检查 used_by 是否填错。' };
       }
-      
+
       // 先让服务端把该用户的 Auth 邮箱+密码同步，再登录，保证仅凭 t 即可进入
       console.log('[handleAutoLogin] 开始密钥同步...');
       const syncRes = await syncKeyPassword(preUserId, rawToken);
       console.log('[handleAutoLogin] 密钥同步结果:', syncRes);
-      
+
       if (!syncRes.ok) {
         console.error('[handleAutoLogin] 密钥同步失败:', syncRes.error);
         // 生成详细的错误信息，包含所有可能的调试信息
@@ -325,15 +325,15 @@ const App: React.FC = () => {
         console.error('[handleAutoLogin] 详细错误信息:', detailedError);
         return { ok: false, error: detailedError };
       }
-      
+
       // 同步成功后，使用派生密码登录
       console.log('[handleAutoLogin] 密钥同步成功，开始登录...');
       const password = getTokenBasedPassword(preUserId);
       console.log('[handleAutoLogin] 登录参数:', { nickname: profile.nickname, password });
-      
+
       const result = await signInWithPasswordOnly(profile.nickname, password);
       console.log('[handleAutoLogin] 登录结果:', result);
-      
+
       if (result.error) {
         console.error('[handleAutoLogin] 登录失败:', result.error);
         return {
@@ -342,11 +342,11 @@ const App: React.FC = () => {
             (result.error.message ? ' 详情：' + result.error.message : ''),
         };
       }
-      
+
       // 登录成功，记录登录历史
       console.log('[handleAutoLogin] 登录成功，记录登录历史...');
       await recordLoginHistory(preRow.used_by, preUserId, 'success');
-      
+
       // 登录成功
       console.log('[handleAutoLogin] 登录成功，加载用户数据...');
       sessionStorage.removeItem('jws_invite_token');
@@ -357,7 +357,7 @@ const App: React.FC = () => {
       setDailyLoginLimit(loginCheckResult.dailyLoginLimit || 5);
       await loadUserData(profile.id);
       console.log('[handleAutoLogin] 自动登录流程完成');
-      return { 
+      return {
         ok: true,
         dailyLoginCount: loginCheckResult.dailyLoginCount,
         dailyLoginLimit: loginCheckResult.dailyLoginLimit
@@ -378,12 +378,12 @@ const App: React.FC = () => {
 
   const handleAscend = async () => {
     if (!user || !canAscend || user.promotion_pending) return;
-    
+
     try {
       // 生成等级提升二维码
       const targetLevelValue = user.level + 1;
       const { qrCodeUrl, qrCodeContent, qrCodeId } = await generateLevelQRCode(user.id, user.level, targetLevelValue);
-      
+
       // 直接显示等级提升二维码模态框，跳过中间的晋升UI
       setLevelQRCodeUrl(qrCodeUrl);
       setLevelQRCodeContent(qrCodeContent);
@@ -395,14 +395,14 @@ const App: React.FC = () => {
       alert('申请等级提升失败，请重试');
     }
   };
-  
+
   // 处理等级提升二维码取消
   const handleLevelQRCancel = async () => {
     if (levelQRCodeId) {
       // 这里可以添加取消等级提升二维码的逻辑
       console.log('取消等级提升二维码:', levelQRCodeId);
     }
-    
+
     // 更新用户状态
     if (user) {
       await supabase
@@ -410,25 +410,25 @@ const App: React.FC = () => {
         .update({ promotion_pending: false })
         .eq('id', user.id);
     }
-    
+
     setShowLevelQRModal(false);
     setLevelQRCodeUrl('');
     setLevelQRCodeContent('');
     setLevelQRCodeId('');
     setTargetLevel(1);
   };
-  
+
   // 处理等级提升验证确认
   const handleLevelVerifyConfirm = async (confirm: boolean) => {
     setShowLevelVerifyConfirm(false);
-    
+
     if (!confirm || !user || !scannedLevelData.userId) {
       return;
     }
-    
+
     try {
       const { userId, currentLevel, targetLevel, qrCodeId } = scannedLevelData;
-      
+
       // 完成等级提升验证
       const result = await completeLevelPromotion(qrCodeId, userId, user.id, currentLevel, targetLevel);
       if (result.ok) {
@@ -447,20 +447,20 @@ const App: React.FC = () => {
       alert('请先登录');
       return;
     }
-    
+
     const quest = quests.find(q => q.id === questId);
     if (!quest) return;
-    
+
     if (quest.cost && (user.coins || 0) < quest.cost) {
       alert('织梦币不足');
       return;
     }
-    
+
     // 检查任务是否需要师傅验证
     // 这里假设quest对象包含needs_verification属性
     // 如果没有该属性，默认需要验证
     const needsVerification = quest.needs_verification !== false;
-    
+
     if (needsVerification) {
       // 需要师傅验证，生成任务二维码
       try {
@@ -475,7 +475,7 @@ const App: React.FC = () => {
         setQrCodeContent('jws:quest:error');
         setQrCodeId('');
       }
-      
+
       setPendingQuest(quest);
     } else {
       // 不需要师傅验证，直接完成任务
@@ -485,10 +485,10 @@ const App: React.FC = () => {
 
   const finalizeQuest = async (questToComplete: Quest) => {
     if (!user) return;
-    
+
     // 更新本地状态
     setCompletedQuests(prev => [...prev, questToComplete.id]);
-    
+
     // 更新数据库
     await addQuestRecord(user.id, questToComplete.id, qrCodeId, questToComplete.type);
     await updateProfile({
@@ -496,7 +496,7 @@ const App: React.FC = () => {
       yc: (user.yc || 0) + questToComplete.ycReward,
       inspiration: (user.inspiration || 0) + questToComplete.insReward
     });
-    
+
     // 更新本地用户状态
     setUser(prev => prev ? ({
       ...prev,
@@ -504,24 +504,24 @@ const App: React.FC = () => {
       yc: prev.yc + questToComplete.ycReward,
       inspiration: prev.inspiration + questToComplete.insReward
     }) : null);
-    
+
     setPendingQuest(null);
     alert(`核验成功！心愿「${questToComplete.title}」已圆满达成。`);
   };
 
   const handleScanSuccess = async (data: string) => {
     setShowScanner(false);
-    
+
     if (!user) {
       alert('请先登录');
       return;
     }
-    
+
     // 检查是否是师傅
     if (user.is_master) {
       // 检查二维码类型
       const isLevelQRCode = data.startsWith('jws:level:');
-      
+
       if (isLevelQRCode) {
         // 师傅扫描等级提升二维码
         try {
@@ -579,31 +579,31 @@ const App: React.FC = () => {
       alert('请先登录');
       return;
     }
-    
+
     if (user.yc < cost) {
       alert('织梦币不足，多去完成心愿吧。');
       return;
     }
-    
+
     // 更新本地状态
     setUserInventory(prev => [...prev, itemId]);
-    
+
     // 更新数据库
     await addRedemptionRecord(user.id, itemId, cost);
     await updateProfile({ yc: user.yc - cost });
-    
+
     setUser(prev => prev ? { ...prev, yc: prev.yc - cost } : null);
     alert('兑换成功，凭证已入乾坤袋。');
   };
-  
+
   // 处理师傅核验确认
   const handleVerifyConfirm = async (confirm: boolean) => {
     setShowVerifyConfirm(false);
-    
+
     if (!confirm || !user || !scannedQuestId || !scannedUserId || !scannedQRCodeId) {
       return;
     }
-    
+
     try {
       // 获取任务信息
       const quest = quests.find(q => q.id === scannedQuestId);
@@ -611,14 +611,14 @@ const App: React.FC = () => {
         alert('任务不存在');
         return;
       }
-      
+
       // 检查任务是否已完成
-      const isCompleted = await isQuestCompleted(scannedUserId, scannedQuestId);
+      const isCompleted = await isQuestCompleted(scannedUserId, scannedQuestId, quest.type);
       if (isCompleted) {
         alert('任务已经完成，无需重复核验');
         return;
       }
-      
+
       // 更新二维码状态
       const updateStatusResult = await updateQuestQRCodeStatus(scannedQRCodeId);
       if (updateStatusResult.error) {
@@ -626,7 +626,7 @@ const App: React.FC = () => {
         alert('更新二维码状态失败，请重试');
         return;
       }
-      
+
       // 添加任务完成记录
       // 从quests数组中查找任务类型
       const questType = quest?.type || 'daily';
@@ -636,7 +636,7 @@ const App: React.FC = () => {
         alert('添加任务记录失败，请重试');
         return;
       }
-      
+
       // 更新用户数据（使用存储过程发放奖励）
       const { error: updateUserError } = await supabase
         .rpc('update_user_reward', {
@@ -645,13 +645,13 @@ const App: React.FC = () => {
           p_yc_reward: quest.ycReward,
           p_inspiration_reward: quest.insReward
         });
-      
+
       if (updateUserError) {
         console.error('更新用户数据失败:', updateUserError);
         alert('更新用户数据失败，请重试');
         return;
       }
-      
+
       alert('核验成功！任务已完成。');
     } catch (error) {
       console.error('核验确认失败:', error);
@@ -668,7 +668,7 @@ const App: React.FC = () => {
   // 显示等待页面（没有邀请码）
   if (!isLoading && !user && !inviteToken) {
     return (
-      <WaitingPage 
+      <WaitingPage
         onRefresh={() => {
           const token = sessionStorage.getItem('jws_invite_token');
           if (token) {
@@ -682,7 +682,7 @@ const App: React.FC = () => {
   // 显示登录页面（未登录但有邀请码）
   if (!isLoading && !user) {
     return (
-      <LandingPage 
+      <LandingPage
         onLogin={handleLogin}
         onAutoLogin={handleAutoLogin}
         isLoading={isLoading}
@@ -698,7 +698,7 @@ const App: React.FC = () => {
         <div className="text-center">
           <div className="text-4xl mb-4">🧶</div>
           <p className="text-slate-600 font-serif">正在连接织梦手记...</p>
-          {!isConnected && <p className="text-xs text-amber-500 mt-2">正在连接中</p>}
+          {!isConnected && <p className="text-xs text-amber-500 mt-2">庭院打扫中</p>}
         </div>
       </div>
     );
@@ -729,7 +729,7 @@ const App: React.FC = () => {
             <span className="text-[10px] font-bold text-slate-800">{user?.inspiration || 0} / {currentLevelData.inspirationRequired}</span>
           </div>
           <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-            <div 
+            <div
               className="h-full bg-gradient-to-r from-emerald-400 via-rose-300 to-amber-400 transition-all duration-1000"
               style={{ width: `${Math.min(((user?.inspiration || 0) / currentLevelData.inspirationRequired) * 100, 100)}%` }}
             ></div>
@@ -758,12 +758,11 @@ const App: React.FC = () => {
                   <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 italic">本阶里程碑作品</h3>
                   <p className="text-sm font-medium leading-relaxed text-slate-700">"{currentLevelData.exam}"</p>
                 </div>
-                <button 
+                <button
                   onClick={handleAscend}
                   disabled={!canAscend}
-                  className={`w-full py-4 rounded-xl font-bold text-xs uppercase tracking-widest transition-all transform active:scale-95 shadow-md ${
-                    canAscend ? 'bg-slate-800 text-white hover:bg-slate-700' : 'bg-slate-50 text-slate-300 border'
-                  }`}
+                  className={`w-full py-4 rounded-xl font-bold text-xs uppercase tracking-widest transition-all transform active:scale-95 shadow-md ${canAscend ? 'bg-slate-800 text-white hover:bg-slate-700' : 'bg-slate-50 text-slate-300 border'
+                    }`}
                 >
                   {canAscend ? '创意满溢 · 开启新篇章' : `还需 ${currentLevelData.inspirationRequired - (user?.inspiration || 0)} 创意`}
                 </button>
@@ -771,9 +770,8 @@ const App: React.FC = () => {
             </div>
             <div className="flex gap-4 overflow-x-auto pb-4 scroll-hide px-1">
               {SKILL_PATHS.map(path => (
-                <div key={path.id} className={`min-w-[150px] p-5 rounded-2xl border text-center transition-all bg-white shadow-sm ${
-                  user?.skill_path === path.id ? 'border-rose-400 bg-rose-50/30' : 'border-slate-100'
-                } ${(user?.level || 0) < 3 ? 'opacity-30 grayscale' : ''}`}>
+                <div key={path.id} className={`min-w-[150px] p-5 rounded-2xl border text-center transition-all bg-white shadow-sm ${user?.skill_path === path.id ? 'border-rose-400 bg-rose-50/30' : 'border-slate-100'
+                  } ${(user?.level || 0) < 3 ? 'opacity-30 grayscale' : ''}`}>
                   <span className="text-4xl block mb-3">{path.icon}</span>
                   <h4 className="text-sm font-bold text-slate-800">{path.name}</h4>
                   <p className="text-[10px] text-slate-400 mt-1">{path.focus}</p>
@@ -794,12 +792,11 @@ const App: React.FC = () => {
                 { id: 'labor', label: '工坊清单', color: 'text-emerald-700' },
                 { id: 'patron', label: '限定通告', color: 'text-rose-700' }
               ].map(tab => (
-                <button 
+                <button
                   key={tab.id}
                   onClick={() => setQuestSubTab(tab.id as any)}
-                  className={`flex-1 py-2.5 text-[10px] font-bold rounded-lg transition-all ${
-                    questSubTab === tab.id ? 'bg-white shadow-sm ' + tab.color : 'text-slate-400'
-                  }`}
+                  className={`flex-1 py-2.5 text-[10px] font-bold rounded-lg transition-all ${questSubTab === tab.id ? 'bg-white shadow-sm ' + tab.color : 'text-slate-400'
+                    }`}
                 >
                   {tab.label}
                 </button>
@@ -807,9 +804,9 @@ const App: React.FC = () => {
             </div>
             <div className="space-y-6">
               {quests.filter(q => q.type === questSubTab).map(quest => (
-                <QuestCard 
-                  key={quest.id} 
-                  quest={quest} 
+                <QuestCard
+                  key={quest.id}
+                  quest={quest}
                   playerLevel={user?.level || 1}
                   isCompleted={completedQuests.includes(quest.id)}
                   isPending={pendingQuest?.id === quest.id}
@@ -832,7 +829,7 @@ const App: React.FC = () => {
                   <span className="text-4xl mb-4 transform transition-transform hover:scale-110">{item.icon}</span>
                   <h4 className="text-xs font-black text-slate-800 mb-1">{item.name}</h4>
                   <p className="text-[10px] text-slate-400 h-10 line-clamp-2 mb-4 leading-relaxed">{item.description}</p>
-                  <button 
+                  <button
                     onClick={() => handleBuyItem(item.id, item.cost)}
                     className="w-full py-2 bg-slate-800 text-white text-[10px] font-bold rounded-lg shadow-md"
                   >
@@ -847,14 +844,14 @@ const App: React.FC = () => {
         {activeTab === 'profile' && (
           <div className="fade-in space-y-6">
             <div className="bg-white p-8 rounded-2xl border text-center relative shadow-sm">
-              <button 
+              <button
                 onClick={handleLogout}
                 className="absolute top-4 right-4 text-xs text-slate-400 hover:text-slate-600"
               >
                 退出登录
               </button>
               <div className="w-24 h-24 mx-auto mb-5 rounded-full border-4 border-rose-100 overflow-hidden bg-slate-50 p-1">
-                 <img className="w-full h-full rounded-full" src={`https://api.dicebear.com/7.x/adventurer/svg?seed=${user?.nickname || 'default'}`} alt="Avatar" />
+                <img className="w-full h-full rounded-full" src={`https://api.dicebear.com/7.x/adventurer/svg?seed=${user?.nickname || 'default'}`} alt="Avatar" />
               </div>
               <h2 className="text-xl font-black text-slate-800">{user?.nickname}</h2>
               <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-1">第 {user?.level || 1} 境 织梦人</p>
@@ -897,7 +894,7 @@ const App: React.FC = () => {
           { id: 'shop', label: '阁楼', icon: 'M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z' },
           { id: 'profile', label: '手记', icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z' }
         ].map(tab => (
-          <button 
+          <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
             className={`flex flex-col items-center gap-1 transition-all flex-1 ${activeTab === tab.id ? 'text-rose-500 scale-105' : 'text-slate-300'}`}
@@ -910,9 +907,9 @@ const App: React.FC = () => {
 
       <AnimatePresence>
         {pendingQuest && user && (
-          <QRModal 
+          <QRModal
             key="qr-modal"
-            quest={pendingQuest} 
+            quest={pendingQuest}
             qrCodeUrl={qrCodeUrl}
             qrCodeContent={qrCodeContent}
             qrCodeId={qrCodeId}
@@ -926,7 +923,7 @@ const App: React.FC = () => {
                 });
               }
               setPendingQuest(null);
-            }} 
+            }}
             onSimulateVerify={() => finalizeQuest(pendingQuest)}
             onQuestCompleted={() => {
               // 重新加载用户数据，实现无刷更新
@@ -940,23 +937,23 @@ const App: React.FC = () => {
           />
         )}
         {showScanner && (
-          <ScannerOverlay 
+          <ScannerOverlay
             key="scanner"
-            onScan={handleScanSuccess} 
-            onClose={() => setShowScanner(false)} 
+            onScan={handleScanSuccess}
+            onClose={() => setShowScanner(false)}
           />
         )}
-        
+
         {/* 等级提升二维码模态框 */}
         {showLevelQRModal && (
-          <motion.div 
+          <motion.div
             key="level-qr-modal"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[100] bg-slate-900/90 flex items-center justify-center p-8 backdrop-blur-md"
           >
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               className="bg-white w-full max-w-xs rounded-[2.5rem] p-8 flex flex-col items-center text-center shadow-2xl space-y-6 relative overflow-hidden"
@@ -980,36 +977,36 @@ const App: React.FC = () => {
               </div>
 
               <div className="bg-slate-50 p-4 rounded-3xl border-2 border-dashed border-slate-200 w-full z-10">
-                 <p className="text-[10px] font-black text-slate-300 uppercase mb-2">提升信息</p>
-                 <p className="text-sm font-bold text-slate-700">当前等级: {user?.level || 1} → 目标等级: {targetLevel}</p>
+                <p className="text-[10px] font-black text-slate-300 uppercase mb-2">提升信息</p>
+                <p className="text-sm font-bold text-slate-700">当前等级: {user?.level || 1} → 目标等级: {targetLevel}</p>
               </div>
 
               {/* Level QR Code */}
               <div className="p-4 bg-white border-4 border-slate-100 rounded-3xl shadow-inner relative group z-10 flex items-center justify-center">
-                <img 
-                  src={levelQRCodeUrl} 
-                  alt="等级提升验证二维码" 
+                <img
+                  src={levelQRCodeUrl}
+                  alt="等级提升验证二维码"
                   className="w-48 h-48 object-contain"
                 />
-                <motion.div 
+                <motion.div
                   animate={{ opacity: [0.3, 0.6, 0.3] }}
                   transition={{ duration: 2, repeat: Infinity }}
                   className="absolute inset-0 flex items-center justify-center"
                 >
-                   <span className="text-4xl">✨</span>
+                  <span className="text-4xl">✨</span>
                 </motion.div>
               </div>
 
               <div className="space-y-3 z-10">
                 <p className="text-[10px] text-slate-400 font-serif italic">请展示给师傅核验</p>
                 <div className="flex items-center justify-center gap-1">
-                   <span className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse"></span>
-                   <span className="text-[9px] font-bold text-amber-600 uppercase tracking-tighter">等待师傅验收...</span>
+                  <span className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse"></span>
+                  <span className="text-[9px] font-bold text-amber-600 uppercase tracking-tighter">等待师傅验收...</span>
                 </div>
               </div>
 
               <div className="w-full flex flex-col gap-2 pt-2 z-10">
-                <button 
+                <button
                   onClick={handleLevelQRCancel}
                   className="w-full py-3 border border-slate-200 text-slate-400 rounded-xl font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all"
                 >
@@ -1019,17 +1016,17 @@ const App: React.FC = () => {
             </motion.div>
           </motion.div>
         )}
-        
+
         {/* 等级提升验证确认模态框 */}
         {showLevelVerifyConfirm && (
-          <motion.div 
+          <motion.div
             key="level-verify-confirm"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[100] bg-slate-900/90 flex items-center justify-center p-8 backdrop-blur-md"
           >
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               className="bg-white w-full max-w-xs rounded-[2.5rem] p-8 flex flex-col items-center text-center shadow-2xl space-y-6 relative overflow-hidden"
@@ -1045,13 +1042,13 @@ const App: React.FC = () => {
               </div>
 
               <div className="w-full flex flex-col gap-3 pt-2 z-10">
-                <button 
+                <button
                   onClick={() => handleLevelVerifyConfirm(true)}
                   className="w-full py-3 bg-rose-500 text-white rounded-xl font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all"
                 >
                   确认提升
                 </button>
-                <button 
+                <button
                   onClick={() => handleLevelVerifyConfirm(false)}
                   className="w-full py-3 border border-slate-200 text-slate-400 rounded-xl font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all"
                 >
@@ -1062,7 +1059,7 @@ const App: React.FC = () => {
           </motion.div>
         )}
         {user?.is_master && (
-          <motion.div 
+          <motion.div
             key="master-button"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -1079,7 +1076,7 @@ const App: React.FC = () => {
           </motion.div>
         )}
         {showVerifyConfirm && (
-          <motion.div 
+          <motion.div
             key="verify-confirm"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -1113,7 +1110,7 @@ const App: React.FC = () => {
           </motion.div>
         )}
         {showAscendModal && (
-          <motion.div 
+          <motion.div
             key="ascend-modal"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -1131,13 +1128,13 @@ const App: React.FC = () => {
                 <p className="font-serif italic text-xl leading-snug">"{currentLevelData.exam}"</p>
               </div>
               <div className="space-y-4 pt-4">
-                <button 
+                <button
                   onClick={handleAscend}
                   className="w-full py-5 bg-slate-800 text-white rounded-2xl font-bold uppercase tracking-widest shadow-xl active:translate-y-1 transition-all"
                 >
                   已达成 · 开启新篇章
                 </button>
-                <button 
+                <button
                   onClick={() => setShowAscendModal(false)}
                   className="w-full py-4 text-slate-400 text-xs font-bold uppercase tracking-widest"
                 >
