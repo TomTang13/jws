@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Quest } from '../src/types';
-import { checkQuestStatus, expireQuestQRCode } from '../src/dataService';
+import { checkQRCodeVerified, expireQuestQRCode } from '../src/dataService';
 
 interface QRModalProps {
   quest: Quest;
@@ -19,17 +19,16 @@ export const QRModal: React.FC<QRModalProps> = ({ quest, qrCodeUrl, qrCodeConten
   const [countdown, setCountdown] = useState(120);
 
   useEffect(() => {
-    // Auto-check verification status every 2 seconds
+    // Auto-check QR code verification status every 2 seconds
     const checkInterval = setInterval(async () => {
       try {
-        console.log('Checking quest status...');
-        const isCompleted = await checkQuestStatus(userId, quest.id, quest.type);
-        console.log('Quest status check result:', isCompleted);
-        if (isCompleted) {
+        console.log('Checking QR code status for:', qrCodeId);
+        const isVerified = await checkQRCodeVerified(qrCodeId);
+        console.log('QR code verification result:', isVerified);
+        if (isVerified) {
           // Clear the interval before completing the process
           clearInterval(checkInterval);
           // Quest has been verified by master, just close the modal
-          // Do NOT call onSimulateVerify here as master has already added the quest record
           onCancel();
           alert(`核验成功！心愿「${quest.title}」已圆满达成。`);
           // 通知父组件更新用户数据
@@ -38,7 +37,7 @@ export const QRModal: React.FC<QRModalProps> = ({ quest, qrCodeUrl, qrCodeConten
           }
         }
       } catch (error) {
-        console.error('Error checking verification status:', error);
+        console.error('Error checking QR code status:', error);
       }
     }, 2000);
 
@@ -57,7 +56,7 @@ export const QRModal: React.FC<QRModalProps> = ({ quest, qrCodeUrl, qrCodeConten
       clearInterval(checkInterval);
       clearInterval(countdownInterval);
     };
-  }, [quest.id, userId, onCancel, quest.title, onQuestCompleted]);
+  }, [qrCodeId, userId, onCancel, quest.title, onQuestCompleted]);
 
   // Handle countdown expiration
   useEffect(() => {
@@ -76,7 +75,7 @@ export const QRModal: React.FC<QRModalProps> = ({ quest, qrCodeUrl, qrCodeConten
 
   return (
     <div className="fixed inset-0 z-[100] bg-slate-900/90 flex items-center justify-center p-8 backdrop-blur-md">
-      <motion.div 
+      <motion.div
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         className="bg-white w-full max-w-xs rounded-[2.5rem] p-8 flex flex-col items-center text-center shadow-2xl space-y-6 relative overflow-hidden"
@@ -100,31 +99,31 @@ export const QRModal: React.FC<QRModalProps> = ({ quest, qrCodeUrl, qrCodeConten
         </div>
 
         <div className="bg-slate-50 p-4 rounded-3xl border-2 border-dashed border-slate-200 w-full z-10">
-           <p className="text-[10px] font-black text-slate-300 uppercase mb-2">委托项目</p>
-           <p className="text-sm font-bold text-slate-700">{quest.title}</p>
+          <p className="text-[10px] font-black text-slate-300 uppercase mb-2">委托项目</p>
+          <p className="text-sm font-bold text-slate-700">{quest.title}</p>
         </div>
 
         {/* Real QR Code */}
         <div className="p-4 bg-white border-4 border-slate-100 rounded-3xl shadow-inner relative group z-10 flex items-center justify-center">
-          <img 
-            src={qrCodeUrl} 
-            alt="任务核验二维码" 
+          <img
+            src={qrCodeUrl}
+            alt="任务核验二维码"
             className="w-48 h-48 object-contain"
           />
-          <motion.div 
+          <motion.div
             animate={{ opacity: [0.3, 0.6, 0.3] }}
             transition={{ duration: 2, repeat: Infinity }}
             className="absolute inset-0 flex items-center justify-center"
           >
-             <span className="text-4xl">🪡</span>
+            <span className="text-4xl">🪡</span>
           </motion.div>
         </div>
 
         <div className="space-y-3 z-10">
           <p className="text-[10px] text-slate-400 font-serif italic">请展示给师傅核验</p>
           <div className="flex items-center justify-center gap-1">
-             <span className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse"></span>
-             <span className="text-[9px] font-bold text-amber-600 uppercase tracking-tighter">等待师傅法力接入...</span>
+            <span className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse"></span>
+            <span className="text-[9px] font-bold text-amber-600 uppercase tracking-tighter">等待师傅法力接入...</span>
           </div>
           <div className="flex items-center justify-center gap-2">
             <span className="text-[10px] font-bold text-slate-500 uppercase">剩余时间</span>
@@ -133,7 +132,7 @@ export const QRModal: React.FC<QRModalProps> = ({ quest, qrCodeUrl, qrCodeConten
         </div>
 
         <div className="w-full flex flex-col gap-2 pt-2 z-10">
-          <button 
+          <button
             onClick={onCancel}
             className="w-full py-3 border border-slate-200 text-slate-400 rounded-xl font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all"
           >
