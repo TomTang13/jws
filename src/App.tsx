@@ -814,17 +814,32 @@ const App: React.FC = () => {
               ))}
             </div>
             <div className="space-y-6">
-              {quests.filter(q => q.type === questSubTab).map(quest => (
-                <QuestCard
-                  key={quest.id}
-                  quest={quest}
-                  playerLevel={user?.level || 1}
-                  isCompleted={completedQuests.includes(quest.id)}
-                  isPending={pendingQuest?.id === quest.id}
-                  canAfford={!quest.cost || (user?.coins || 0) >= (quest.cost || 0)}
-                  onAccept={handleQuestAction}
-                />
-              ))}
+              {quests
+                .filter(q => q.type === questSubTab)
+                .sort((a, b) => {
+                  const getRank = (q: any) => {
+                    if (completedQuests.includes(q.id)) return 3;
+                    if (pendingQuest?.id === q.id) return 0;
+                    const isLocked = (user?.level || 1) < q.targetLv;
+                    const canAfford = !q.cost || (user?.coins || 0) >= q.cost;
+                    if (isLocked || !canAfford) return 2;
+                    return 1;
+                  };
+                  const rankDiff = getRank(a) - getRank(b);
+                  // 相同优先级时，按原有顺序（可以考虑按ID或其他字段，这里保持稳定排序）
+                  return rankDiff;
+                })
+                .map(quest => (
+                  <QuestCard
+                    key={quest.id}
+                    quest={quest}
+                    playerLevel={user?.level || 1}
+                    isCompleted={completedQuests.includes(quest.id)}
+                    isPending={pendingQuest?.id === quest.id}
+                    canAfford={!quest.cost || (user?.coins || 0) >= (quest.cost || 0)}
+                    onAccept={handleQuestAction}
+                  />
+                ))}
             </div>
           </div>
         )}
