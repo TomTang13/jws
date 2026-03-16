@@ -28,10 +28,10 @@ export const QRModal: React.FC<QRModalProps> = ({ quest, qrCodeUrl, qrCodeConten
         if (isVerified) {
           // Clear the interval before completing the process
           clearInterval(checkInterval);
-          // Quest has been verified by master, just close the modal
-          onCancel();
+          // Quest has been verified by master
+          // 注意：不要调用 onCancel()，因为它会把二维码状态改为 cancelled
           alert(`核验成功！心愿「${quest.title}」已圆满达成。`);
-          // 通知父组件更新用户数据
+          // 通知父组件更新用户数据并关闭弹窗
           if (onQuestCompleted) {
             onQuestCompleted();
           }
