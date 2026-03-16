@@ -940,7 +940,8 @@ const App: React.FC = () => {
               // 关闭弹窗并重新加载用户数据
               setPendingQuest(null);
               if (user) {
-                loadUserData(user.id).then(() => {
+                // 必须传入 quests 避免闭包捕获初始化时的常量短 ID
+                loadUserData(user.id, quests).then(() => {
                   console.log('用户数据更新成功');
                 });
               }

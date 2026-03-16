@@ -387,19 +387,25 @@ export async function isQuestCompleted(
 ): Promise<boolean> {
   try {
     if (questType === 'daily') {
-      // 对于daily任务，检查当天是否已完成
+      // 对于daily任务，检查特定任务当天是否已完成（每个 daily 任务每天限一次）
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayISO = today.toISOString();
+
       const { data, error } = await supabase
-        .rpc('is_daily_quest_completed_today', {
-          p_user_id: userId,
-          p_quest_id: questId
-        });
+        .from('user_quests')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('quest_template_id', questId) // 改回具体检查这个任务ID
+        .eq('status', 'completed')
+        .gte('completed_at', todayISO);
 
       if (error) {
         console.error('检查daily任务状态失败:', error);
         return false;
       }
 
-      return data || false;
+      return data && data.length > 0;
     } else {
       // 对于非daily任务，保持原有逻辑
       const { data } = await supabase
