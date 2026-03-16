@@ -38,12 +38,12 @@ export async function getLevels(): Promise<LevelConfig[]> {
     .from('levels')
     .select('*')
     .order('level', { ascending: true });
-  
+
   if (error || !data) {
     console.error('获取等级失败:', error);
     return [];
   }
-  
+
   return data.map((l: DatabaseLevel) => ({
     lv: l.level,
     title: l.title,
@@ -65,25 +65,25 @@ export async function getQuests(type: 'daily' | 'labor' | 'patron'): Promise<Que
     'labor': 'bounty',
     'patron': 'milestone'
   };
-  
+
   const { data, error } = await supabase
     .from('quest_templates')
     .select('*')
     .eq('category', categoryMap[type])
     .eq('is_active', true)
     .order('min_level', { ascending: true });
-  
+
   if (error || !data) {
     console.error('获取任务失败:', error);
     return [];
   }
-  
+
   const typeMap: Record<string, 'daily' | 'labor' | 'patron'> = {
     'daily': 'daily',
     'bounty': 'labor',
     'milestone': 'patron'
   };
-  
+
   return data.map((q: DatabaseQuest) => ({
     id: q.id,
     title: q.title,
@@ -107,12 +107,12 @@ export async function getShopItems(): Promise<ShopItem[]> {
     .select('*')
     .eq('is_active', true)
     .order('created_at', { ascending: true });
-  
+
   if (error || !data) {
     console.error('获取商店失败:', error);
     return [];
   }
-  
+
   return data.map((item: DatabaseShopItem, index: number) => ({
     id: item.id,
     name: item.title,
@@ -126,7 +126,7 @@ export async function getShopItems(): Promise<ShopItem[]> {
 export async function getUserCompletedQuests(userId: string, quests: any[]): Promise<string[]> {
   try {
     const completedQuests = [];
-    
+
     // 对于每个任务，检查其完成状态
     for (const quest of quests) {
       const isCompleted = await isQuestCompleted(userId, quest.id, quest.type);
@@ -134,7 +134,7 @@ export async function getUserCompletedQuests(userId: string, quests: any[]): Pro
         completedQuests.push(quest.id);
       }
     }
-    
+
     return completedQuests;
   } catch (error) {
     console.error('获取已完成任务失败:', error);
@@ -146,7 +146,7 @@ export async function getUserCompletedQuests(userId: string, quests: any[]): Pro
 export async function checkQuestStatus(userId: string, questId: string, questType: string): Promise<boolean> {
   try {
     console.log('Checking quest status with:', { userId, questId, questType });
-    
+
     // 直接调用isQuestCompleted函数，复用相同的逻辑
     return await isQuestCompleted(userId, questId, questType);
   } catch (error) {
@@ -162,7 +162,7 @@ export async function getUserInventory(userId: string): Promise<string[]> {
     .select('shop_item_id')
     .eq('user_id', userId)
     .eq('status', 'completed');
-  
+
   return data?.map(r => r.shop_item_id) || [];
 }
 
@@ -173,38 +173,37 @@ export async function getUserData(userId: string) {
     .select('*')
     .eq('id', userId)
     .single();
-  
+
   return profile;
 }
 
 // 更新用户进度
 export async function updateUserProgress(
-  userId: string, 
+  userId: string,
   updates: Partial<{ coins: number; yc: number; inspiration: number; level: number }>
 ) {
   const { error } = await supabase
     .from('profiles')
     .update(updates)
     .eq('id', userId);
-  
+
   return { error };
 }
 
 // 添加任务完成记录
 export async function addQuestRecord(
-  userId: string, 
+  userId: string,
   questId: string,
   qrCodeId: string,
-  questType: string
+  _questType?: string  // 数据库函数不需要此参数，保留签名兼容性
 ) {
   const { error } = await supabase
     .rpc('add_quest_record', {
       p_user_id: userId,
       p_quest_id: questId,
-      p_qr_code_id: qrCodeId,
-      p_quest_type: questType
+      p_qr_code_id: qrCodeId
     });
-  
+
   return { error };
 }
 
@@ -222,7 +221,7 @@ export async function addRedemptionRecord(
       cost_coins: cost,
       status: 'completed'
     });
-  
+
   return { error };
 }
 
@@ -233,10 +232,10 @@ export async function generateQuestQRCode(
 ): Promise<{ qrCodeUrl: string; qrCodeContent: string; qrCodeId: string }> {
   // 生成唯一的二维码内容
   const qrCodeContent = `jws:quest:${questId}:${userId}:${Date.now()}:${Math.random().toString(36).substr(2, 9)}`;
-  
+
   // 使用在线二维码生成服务
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrCodeContent)}`;
-  
+
   // 保存到数据库
   const { data, error } = await supabase
     .from('quest_qr_codes')
@@ -249,12 +248,12 @@ export async function generateQuestQRCode(
     })
     .select('id')
     .single();
-  
+
   if (error || !data) {
     console.error('生成二维码失败:', error);
     throw error;
   }
-  
+
   return { qrCodeUrl, qrCodeContent, qrCodeId: data.id };
 }
 
@@ -267,33 +266,33 @@ export async function verifyQuestQRCode(
   if (parts.length < 5 || parts[0] !== 'jws' || parts[1] !== 'quest') {
     return { ok: false, error: '无效的二维码内容' };
   }
-  
+
   const questId = parts[2];
   const userId = parts[3];
-  
+
   // 检查二维码是否存在
   const { data: qrCode, error } = await supabase
     .from('quest_qr_codes')
     .select('*')
     .eq('qr_code_content', qrCodeContent)
     .single();
-  
+
   if (error || !qrCode) {
     return { ok: false, error: '二维码不存在' };
   }
-  
+
   if (qrCode.status === 'verified') {
     return { ok: false, error: '二维码已验证' };
   }
-  
+
   if (qrCode.status === 'expired') {
     return { ok: false, error: '二维码已过期' };
   }
-  
+
   if (qrCode.status === 'cancelled') {
     return { ok: false, error: '二维码已取消' };
   }
-  
+
   // 只返回二维码信息，不更新状态
   return { ok: true, questId, userId, qrCodeId: qrCode.id };
 }
@@ -311,7 +310,7 @@ export async function expireQuestQRCode(
         expired_at: new Date().toISOString()
       })
       .eq('id', qrCodeId);
-    
+
     return { ok: true };
   } catch (error) {
     console.error('过期二维码失败:', error);
@@ -332,7 +331,7 @@ export async function cancelQuestQRCode(
         cancelled_at: new Date().toISOString()
       })
       .eq('id', qrCodeId);
-    
+
     return { ok: true };
   } catch (error) {
     console.error('取消二维码失败:', error);
@@ -354,7 +353,7 @@ export async function updateQuestQRCodeStatus(
         scanned_at: new Date().toISOString()
       })
       .eq('id', qrCodeId);
-    
+
     return { ok: true };
   } catch (error) {
     console.error('更新二维码状态失败:', error);
@@ -376,12 +375,12 @@ export async function isQuestCompleted(
           p_user_id: userId,
           p_quest_id: questId
         });
-      
+
       if (error) {
         console.error('检查daily任务状态失败:', error);
         return false;
       }
-      
+
       return data || false;
     } else {
       // 对于非daily任务，保持原有逻辑
@@ -391,7 +390,7 @@ export async function isQuestCompleted(
         .eq('user_id', userId)
         .eq('quest_template_id', questId)
         .eq('status', 'completed');
-      
+
       return data && data.length > 0;
     }
   } catch (error) {
@@ -408,10 +407,10 @@ export async function generateLevelQRCode(
 ): Promise<{ qrCodeUrl: string; qrCodeContent: string; qrCodeId: string }> {
   // 生成唯一的二维码内容
   const qrCodeContent = `jws:level:${userId}:${currentLevel}:${targetLevel}:${Date.now()}:${Math.random().toString(36).substr(2, 9)}`;
-  
+
   // 使用在线二维码生成服务
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrCodeContent)}`;
-  
+
   // 保存到数据库
   const { data, error } = await supabase
     .from('level_qr_codes')
@@ -425,18 +424,18 @@ export async function generateLevelQRCode(
     })
     .select('id')
     .single();
-  
+
   if (error || !data) {
     console.error('生成等级提升二维码失败:', error);
     throw error;
   }
-  
+
   // 更新用户状态为提升待处理
   await supabase
     .from('profiles')
     .update({ promotion_pending: true })
     .eq('id', userId);
-  
+
   return { qrCodeUrl, qrCodeContent, qrCodeId: data.id };
 }
 
@@ -449,34 +448,34 @@ export async function verifyLevelQRCode(
   if (parts.length < 7 || parts[0] !== 'jws' || parts[1] !== 'level') {
     return { ok: false, error: '无效的等级提升二维码' };
   }
-  
+
   const userId = parts[2];
   const currentLevel = parseInt(parts[3]);
   const targetLevel = parseInt(parts[4]);
-  
+
   // 检查二维码是否存在
   const { data: qrCode, error } = await supabase
     .from('level_qr_codes')
     .select('*')
     .eq('qr_code_content', qrCodeContent)
     .single();
-  
+
   if (error || !qrCode) {
     return { ok: false, error: '二维码不存在' };
   }
-  
+
   if (qrCode.status === 'verified') {
     return { ok: false, error: '二维码已验证' };
   }
-  
+
   if (qrCode.status === 'expired') {
     return { ok: false, error: '二维码已过期' };
   }
-  
+
   if (qrCode.status === 'cancelled') {
     return { ok: false, error: '二维码已取消' };
   }
-  
+
   return { ok: true, userId, currentLevel, targetLevel, qrCodeId: qrCode.id };
 }
 
@@ -494,7 +493,7 @@ export async function updateLevelQRCodeStatus(
         scanned_at: new Date().toISOString()
       })
       .eq('id', qrCodeId);
-    
+
     return { ok: true };
   } catch (error) {
     console.error('更新等级提升二维码状态失败:', error);
@@ -520,12 +519,12 @@ export async function completeLevelPromotion(
         p_current_level: currentLevel,
         p_target_level: targetLevel
       });
-    
+
     if (error) {
       console.error('完成等级提升验证失败:', error);
       return { ok: false, error: error.message || '完成等级提升验证失败' };
     }
-    
+
     if (data && data.ok) {
       return { ok: true };
     } else {
@@ -548,12 +547,12 @@ export async function checkLevelPromotionStatus(
       .rpc('check_level_promotion_status', {
         p_qr_code_id: qrCodeId
       });
-    
+
     if (error) {
       console.error('检查等级提升状态失败:', error);
       return false;
     }
-    
+
     // 检查返回状态是否为已验证
     return data && data.status === 'verified';
   } catch (error) {
