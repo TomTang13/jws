@@ -212,17 +212,32 @@ export async function updateUserProgress(
 export async function addQuestRecord(
   userId: string,
   questId: string,
-  qrCodeId: string,
-  _questType?: string  // 数据库函数不需要此参数，保留签名兼容性
+  qrCodeId?: string,
+  questType?: string
 ) {
-  const { error } = await supabase
-    .rpc('add_quest_record', {
-      p_user_id: userId,
-      p_quest_id: questId,
-      p_qr_code_id: qrCodeId
-    });
+  if (!qrCodeId) {
+    // 对于无需师傅验证的自动完成任务，直接插入记录
+    const { error } = await supabase
+      .from('user_quests')
+      .insert({
+        user_id: userId,
+        quest_template_id: questId,
+        quest_type: questType,
+        status: 'completed',
+        completed_at: new Date().toISOString()
+      });
+    return { error };
+  } else {
+    // 师傅通过核验触发（有 qrCodeId），调用具有权限控制的 RPC
+    const { error } = await supabase
+      .rpc('add_quest_record', {
+        p_user_id: userId,
+        p_quest_id: questId,
+        p_qr_code_id: qrCodeId
+      });
 
-  return { error };
+    return { error };
+  }
 }
 
 // 添加兑换记录
