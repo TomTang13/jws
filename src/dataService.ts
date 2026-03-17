@@ -609,7 +609,7 @@ export async function getGlobalStats() {
       .select(`
         login_time,
         status,
-        profiles!inner (
+        profiles:user_id (
           nickname
         )
       `)
@@ -623,7 +623,7 @@ export async function getGlobalStats() {
       .select(`
         completed_at,
         quest_type,
-        profiles!inner (
+        profiles:user_id (
           nickname
         ),
         quest_templates (
@@ -638,15 +638,15 @@ export async function getGlobalStats() {
     const { data: recentLevels, error: levelError } = await supabase
       .from('level_logs')
       .select(`
-        created_at,
+        promotion_date,
         old_level,
         new_level,
-        profiles!inner (
+        profiles:user_id (
           nickname
         )
       `)
       .eq('status', 'verified')
-      .order('created_at', { ascending: false })
+      .order('promotion_date', { ascending: false })
       .limit(5);
 
     if (loginError) console.error('获取登录统计失败:', loginError);

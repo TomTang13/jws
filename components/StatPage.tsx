@@ -93,7 +93,7 @@ export const StatPage: React.FC<StatPageProps> = ({ onBack }) => {
                         <div key={i} className="flex items-center justify-between bg-rose-50/30 p-3 rounded-xl border border-rose-100/50">
                             <div className="flex flex-col gap-1">
                                 <span className="text-xs font-bold text-rose-900">{item.profiles.nickname}</span>
-                                <span className="text-slate-400 font-mono text-[9px]">{formatDate(item.created_at)}</span>
+                                <span className="text-slate-400 font-mono text-[9px]">{formatDate(item.promotion_date)}</span>
                             </div>
                             <div className="flex items-center gap-2">
                                 <span className="text-[10px] bg-white px-2 py-0.5 rounded border border-rose-100 text-rose-400">Lv.{item.old_level}</span>
