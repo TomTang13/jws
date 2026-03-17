@@ -536,7 +536,8 @@ const App: React.FC = () => {
     alert(`核验成功！心愿「${questToComplete.title}」已圆满达成。`);
   };
 
-  const handleScanSuccess = async (data: string) => {
+  const handleScanSuccess = useCallback(async (data: string) => {
+    console.log('[handleScanSuccess] 扫描成功:', data);
     setShowScanner(false);
 
     if (!user) {
@@ -552,8 +553,10 @@ const App: React.FC = () => {
       if (isLevelQRCode) {
         // 师傅扫描等级提升二维码
         try {
+          console.log('[handleScanSuccess] 验证等级提升二维码...');
           const verifyResult = await verifyLevelQRCode(data);
           if (verifyResult.ok) {
+            console.log('[handleScanSuccess] 等级验证成功:', verifyResult);
             // 保存扫描结果
             setScannedLevelData({
               userId: verifyResult.userId || '',
@@ -564,17 +567,20 @@ const App: React.FC = () => {
             // 弹出二次确认框
             setShowLevelVerifyConfirm(true);
           } else {
+            console.warn('[handleScanSuccess] 等级验证失败:', verifyResult.error);
             alert(`等级提升二维码验证失败: ${verifyResult.error}`);
           }
         } catch (error) {
-          console.error('验证等级提升二维码失败:', error);
+          console.error('[handleScanSuccess] 验证等级提升二维码失败:', error);
           alert('验证等级提升二维码失败，请重试');
         }
       } else {
         // 师傅扫描任务二维码，验证任务
         try {
+          console.log('[handleScanSuccess] 验证任务二维码...');
           const verifyResult = await verifyQuestQRCode(data);
           if (verifyResult.ok) {
+            console.log('[handleScanSuccess] 任务验证成功:', verifyResult);
             // 保存扫描结果
             setScannedQRCodeContent(data);
             setScannedQuestId(verifyResult.questId || '');
@@ -583,10 +589,11 @@ const App: React.FC = () => {
             // 弹出二次确认框
             setShowVerifyConfirm(true);
           } else {
+            console.warn('[handleScanSuccess] 任务验证失败:', verifyResult.error);
             alert(`二维码验证失败: ${verifyResult.error}`);
           }
         } catch (error) {
-          console.error('验证二维码失败:', error);
+          console.error('[handleScanSuccess] 验证二维码失败:', error);
           alert('验证二维码失败，请重试');
         }
       }
@@ -599,7 +606,7 @@ const App: React.FC = () => {
       await updateProfile({ yc: user.yc + 10 });
       setUser(prev => prev ? { ...prev, yc: prev.yc + 10 } : null);
     }
-  };
+  }, [user, pendingQuest]);
 
   const handleBuyItem = async (itemId: string, cost: number) => {
     if (!user) {
