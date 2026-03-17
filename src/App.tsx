@@ -6,6 +6,7 @@ import { LandingPage } from '../components/LandingPage';
 import { WaitingPage } from '../components/WaitingPage';
 import { QRModal } from '../components/QRModal';
 import { ScannerOverlay } from '../components/ScannerOverlay';
+import { StatPage } from '../components/StatPage';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase, testConnection } from './supabase';
 import { signUp, signIn, signInWithPasswordOnly, signOut, syncKeyPassword, onAuthChange, getCurrentUser, updateProfile, getTokenBasedPassword, type UserProfile, checkAndUpdateLoginCount, recordLoginHistory } from './auth';
@@ -23,7 +24,7 @@ const App: React.FC = () => {
   const [dailyLoginCount, setDailyLoginCount] = useState<number>(1);
   const [dailyLoginLimit, setDailyLoginLimit] = useState<number>(5);
 
-  const [activeTab, setActiveTab] = useState<'map' | 'quests' | 'shop' | 'profile'>('map');
+  const [activeTab, setActiveTab] = useState<'map' | 'quests' | 'shop' | 'profile' | 'stat'>('map');
   const [questSubTab, setQuestSubTab] = useState<'daily' | 'labor' | 'patron'>('daily');
   const [showAscendModal, setShowAscendModal] = useState(false);
 
@@ -905,6 +906,15 @@ const App: React.FC = () => {
               <h2 className="text-xl font-black text-slate-800">{user?.nickname}</h2>
               <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-1">第 {user?.level || 1} 境 织梦人</p>
               <p className="text-[10px] mt-2 text-rose-500 font-bold uppercase tracking-widest">{user?.play_style || 'Hybrid'} 流派修行中</p>
+
+              <div className="mt-8 pt-8 border-t flex flex-col gap-4">
+                <button
+                  onClick={() => setActiveTab('stat')}
+                  className="w-full py-4 bg-slate-50 border rounded-2xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors flex items-center justify-center gap-2"
+                >
+                  📊 织梦统计 (全局)
+                </button>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-white p-5 rounded-2xl border text-center shadow-sm">
@@ -931,6 +941,10 @@ const App: React.FC = () => {
               </div>
             </div>
           </div>
+        )}
+
+        {activeTab === 'stat' && (
+          <StatPage onBack={() => setActiveTab('profile')} />
         )}
       </main>
 

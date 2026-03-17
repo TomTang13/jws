@@ -600,3 +600,66 @@ export async function checkLevelPromotionStatus(
     return false;
   }
 }
+// 获取全局统计数据
+export async function getGlobalStats() {
+  try {
+    // 1. 获取最新登录的5个用户 (通过 login_history join profiles)
+    const { data: recentLogins, error: loginError } = await supabase
+      .from('login_history')
+      .select(`
+        login_time,
+        status,
+        profiles!inner (
+          nickname
+        )
+      `)
+      .eq('status', 'success')
+      .order('login_time', { ascending: false })
+      .limit(5);
+
+    // 2. 获取最新完成的5个任务 (通过 user_quests join profiles 和 quest_templates)
+    const { data: recentQuests, error: questError } = await supabase
+      .from('user_quests')
+      .select(`
+        completed_at,
+        quest_type,
+        profiles!inner (
+          nickname
+        ),
+        quest_templates (
+          title
+        )
+      `)
+      .eq('status', 'completed')
+      .order('completed_at', { ascending: false })
+      .limit(5);
+
+    // 3. 获取最新完成的5次升级 (通过 level_logs join profiles)
+    const { data: recentLevels, error: levelError } = await supabase
+      .from('level_logs')
+      .select(`
+        created_at,
+        old_level,
+        new_level,
+        profiles!inner (
+          nickname
+        )
+      `)
+      .eq('status', 'verified')
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    if (loginError) console.error('获取登录统计失败:', loginError);
+    if (questError) console.error('获取任务统计失败:', questError);
+    if (levelError) console.error('获取等级统计失败:', levelError);
+
+    return {
+      logins: recentLogins || [],
+      quests: recentQuests || [],
+      levels: recentLevels || []
+    };
+  } catch (error) {
+    console.error('获取全局统计异常:', error);
+    return { logins: [], quests: [], levels: [] };
+  }
+}
