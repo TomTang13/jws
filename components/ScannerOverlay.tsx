@@ -25,7 +25,7 @@ export const ScannerOverlay: React.FC<ScannerOverlayProps> = ({ onScan, onClose 
         // Check if camera is available
         const devices = await navigator.mediaDevices.enumerateDevices();
         const hasCamera = devices.some(d => d.kind === 'videoinput');
-        
+
         if (!hasCamera) {
           setHasPermission(false);
           setError('未检测到相机设备');
@@ -37,6 +37,7 @@ export const ScannerOverlay: React.FC<ScannerOverlayProps> = ({ onScan, onClose 
         scannerRef.current = scanner;
 
         // Start scanning
+        let isScanned = false;
         await scanner.start(
           { facingMode: 'environment' },
           {
@@ -46,7 +47,12 @@ export const ScannerOverlay: React.FC<ScannerOverlayProps> = ({ onScan, onClose 
           },
           (decodedText) => {
             // Scan success
-            onScan(decodedText);
+            if (!isScanned) {
+              isScanned = true;
+              onScan(decodedText);
+              // 同步暂停扫描，防止后续多余回调
+              scanner.pause(true);
+            }
           },
           () => {
             // QR code not found in this frame, continue scanning
@@ -72,7 +78,7 @@ export const ScannerOverlay: React.FC<ScannerOverlayProps> = ({ onScan, onClose 
   }, [onScan]);
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -81,10 +87,10 @@ export const ScannerOverlay: React.FC<ScannerOverlayProps> = ({ onScan, onClose 
       {/* Scanner View */}
       <div className="relative flex-1 bg-slate-900 flex items-center justify-center overflow-hidden">
         {/* QR Reader Container */}
-        <div 
-          id="qr-reader" 
+        <div
+          id="qr-reader"
           className="absolute inset-0"
-          style={{ 
+          style={{
             position: 'absolute',
             top: 0,
             left: 0,
@@ -117,9 +123,9 @@ export const ScannerOverlay: React.FC<ScannerOverlayProps> = ({ onScan, onClose 
           <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-amber-400 rounded-tr-lg"></div>
           <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-amber-400 rounded-bl-lg"></div>
           <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-amber-400 rounded-br-lg"></div>
-          
+
           {/* Scanning Animation */}
-          <motion.div 
+          <motion.div
             animate={{ top: ['0%', '100%', '0%'] }}
             transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
             className="absolute left-0 right-0 h-0.5 bg-amber-400 shadow-[0_0_15px_rgba(251,191,36,1)] z-20"
@@ -133,7 +139,7 @@ export const ScannerOverlay: React.FC<ScannerOverlayProps> = ({ onScan, onClose 
 
       {/* Controls */}
       <div className="bg-slate-900 p-8 flex justify-center items-center">
-        <button 
+        <button
           onClick={onClose}
           className="text-white text-sm font-bold uppercase tracking-widest opacity-50 hover:opacity-100 transition-opacity"
         >

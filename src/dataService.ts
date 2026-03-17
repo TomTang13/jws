@@ -30,6 +30,7 @@ export interface DatabaseShopItem {
   cost_coins: number;
   stock: number;
   is_active: boolean;
+  icon: string;
 }
 
 // 获取等级配置
@@ -113,12 +114,12 @@ export async function getShopItems(): Promise<ShopItem[]> {
     return [];
   }
 
-  return data.map((item: DatabaseShopItem, index: number) => ({
+  return data.map((item: DatabaseShopItem) => ({
     id: item.id,
     name: item.title,
     description: item.description,
     cost: item.cost_coins,
-    icon: ['🩹', '🎰', '🧋', '📜'][index % 4]
+    icon: item.icon || '🩹'
   }));
 }
 
