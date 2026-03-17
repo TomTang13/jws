@@ -169,7 +169,16 @@ const App: React.FC = () => {
 
       // 加载商店
       const shopData = await getShopItems();
-      if (shopData.length > 0) setShopItems(shopData);
+      if (shopData.length > 0) {
+        // 修正数据库中可能存在的旧图标
+        const fixedShopData = shopData.map((item, index) => {
+          if (index === 0) return { ...item, icon: '🧶' };
+          if (index === 1) return { ...item, icon: '🧿' };
+          if (index === 2) return { ...item, icon: '🏅' };
+          return item;
+        });
+        setShopItems(fixedShopData);
+      }
 
       // 返回真实的 DB quests，供 loadUserData 直接使用（避免 React 状态异步问题）
       return allQuests;
