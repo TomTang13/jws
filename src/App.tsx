@@ -258,9 +258,14 @@ const App: React.FC = () => {
   };
 
   // 已使用过密钥 t：仅凭 t 即可登录（服务端同步派生密码后直接登入，用户无需输入密码）。
-  const handleAutoLogin = async (preUserId: string, rawToken: string): Promise<{ ok: boolean; error?: string; dailyLoginCount?: number; dailyLoginLimit?: number }> => {
+  const handleAutoLogin = async (
+    preUserId: string,
+    rawToken: string,
+    onProgress?: (percent: number, text: string) => void
+  ): Promise<{ ok: boolean; error?: string; dailyLoginCount?: number; dailyLoginLimit?: number }> => {
     console.log('[handleAutoLogin] 开始自动登录流程:', { preUserId, rawToken });
     try {
+      if (onProgress) onProgress(5, '检查通行刻印...');
       // 检查登录次数限制
       console.log('[handleAutoLogin] 检查登录次数限制...');
       const loginCheckResult = await checkAndUpdateLoginCount(preUserId);
@@ -276,6 +281,7 @@ const App: React.FC = () => {
         };
       }
 
+      if (onProgress) onProgress(20, '感知绑定工坊...');
       // 检查 pre_users 表中是否有对应的记录
       console.log('[handleAutoLogin] 查询 pre_users 表...');
       const { data: preRow, error: preRowError } = await supabase
@@ -296,6 +302,7 @@ const App: React.FC = () => {
         return { ok: false, error: 'pre_users.used_by 未填写。请把该密钥对应的用户 id（profiles 表的 id）填入该行的 used_by 列。' };
       }
 
+      if (onProgress) onProgress(35, '搜寻行囊资料...');
       // 检查 profiles 表中是否有对应的用户
       console.log('[handleAutoLogin] 查询 profiles 表...');
       const { data: profile, error: profileError } = await supabase
@@ -316,6 +323,7 @@ const App: React.FC = () => {
         return { ok: false, error: '未找到关联账号：profiles 中不存在 id = ' + preRow.used_by + '，请检查 used_by 是否填错。' };
       }
 
+      if (onProgress) onProgress(50, '校对防伪符文...');
       // 先让服务端把该用户的 Auth 邮箱+密码同步，再登录，保证仅凭 t 即可进入
       console.log('[handleAutoLogin] 开始密钥同步...');
       const syncRes = await syncKeyPassword(preUserId, rawToken);
@@ -339,6 +347,7 @@ const App: React.FC = () => {
         return { ok: false, error: detailedError };
       }
 
+      if (onProgress) onProgress(70, '打开工坊大门...');
       // 同步成功后，使用派生密码登录
       console.log('[handleAutoLogin] 密钥同步成功，开始登录...');
       const password = getTokenBasedPassword(preUserId);
@@ -356,6 +365,7 @@ const App: React.FC = () => {
         };
       }
 
+      if (onProgress) onProgress(85, '加载图纸与委托...');
       // 登录成功，记录登录历史
       console.log('[handleAutoLogin] 登录成功，记录登录历史...');
       await recordLoginHistory(preRow.used_by, preUserId, 'success');
@@ -367,6 +377,8 @@ const App: React.FC = () => {
       setDailyLoginLimit(loginCheckResult.dailyLoginLimit || 5);
       await loadUserData(profile.id);
       setUser(profile);
+
+      if (onProgress) onProgress(100, '即将进入...');
 
       // 数据加载并渲染后再清空 token，防止中间状态跳出 WaitingPage(机缘未止) 界面
       sessionStorage.removeItem('jws_invite_token');

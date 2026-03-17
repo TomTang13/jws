@@ -4,7 +4,7 @@ import { supabase } from '../src/supabase';
 
 interface LandingPageProps {
   onLogin: (nickname: string, preUserId: string) => Promise<boolean>;
-  onAutoLogin: (preUserId: string, token: string) => Promise<{ ok: boolean; error?: string; dailyLoginCount?: number; dailyLoginLimit?: number }>;
+  onAutoLogin: (preUserId: string, token: string, onProgress?: (percent: number, text: string) => void) => Promise<{ ok: boolean; error?: string; dailyLoginCount?: number; dailyLoginLimit?: number }>;
   isLoading: boolean;
   token?: string;
 }
@@ -17,6 +17,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onAutoLogin, 
   const [validToken, setValidToken] = useState<string | null>(null);
   const [validating, setValidating] = useState(false);
   const [autoLoggingIn, setAutoLoggingIn] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState({ percent: 0, text: '启动连接...' });
   const [preUserNickname, setPreUserNickname] = useState<string | null>(null);
   const [preUserId, setPreUserId] = useState<string | null>(null);
 
@@ -33,7 +34,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onAutoLogin, 
     if (!autoLoggingIn || !preUserId) return;
     const rawToken = validToken ?? token ?? '';
     let cancelled = false;
-    onAutoLogin(preUserId, rawToken).then((res) => {
+    onAutoLogin(preUserId, rawToken, (percent, text) => {
+      if (!cancelled) {
+        setLoadingProgress({ percent, text });
+      }
+    }).then((res) => {
       if (cancelled) return;
       setAutoLoggingIn(false);
       if (!res.ok) {
@@ -126,21 +131,21 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onAutoLogin, 
       // 创建一个AbortController来处理超时
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000); // 5秒超时
-      
+
       const { data, error } = await supabase
         .from('profiles')
         .select('id')
         .eq('nickname', nickname.trim())
         .maybeSingle()
         .abortSignal(controller.signal);
-      
+
       clearTimeout(timeoutId);
-      
+
       if (error) {
         console.error('检查昵称失败:', error);
         return false;
       }
-      
+
       return !!data;
     } catch (error) {
       console.error('检查昵称异常:', error);
@@ -158,14 +163,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onAutoLogin, 
       setLoginError('邀请码无效');
       return;
     }
-    
+
     // 检查昵称是否已存在
     const nicknameExists = await checkNicknameExists(name);
     if (nicknameExists) {
       setLoginError('该昵称已被使用，请重新输入');
       return;
     }
-    
+
     // 将昵称写入 pre_users 的 notes 字段
     try {
       console.log('[LandingPage] 将昵称写入 pre_users.notes:', name.trim());
@@ -173,7 +178,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onAutoLogin, 
         .from('pre_users')
         .update({ notes: name.trim() })
         .eq('id', preUserId);
-      
+
       if (error) {
         console.error('更新 pre_users.notes 失败:', error);
         // 继续执行，不阻止登录流程
@@ -184,7 +189,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onAutoLogin, 
       console.error('更新 pre_users.notes 异常:', error);
       // 继续执行，不阻止登录流程
     }
-    
+
     setLoginError('');
     console.log('[LandingPage] 调用 onLogin，传递昵称:', name.trim());
     const success = await onLogin(name.trim(), preUserId);
@@ -195,9 +200,28 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onAutoLogin, 
   if (autoLoggingIn) {
     return (
       <div className="fixed inset-0 z-[100] bg-[#fdfbf7] flex flex-col items-center justify-center p-8 overflow-hidden paper-texture">
-        <div className="text-6xl mb-8 opacity-80">🧶</div>
-        <p className="text-sm text-slate-500 font-serif">正在进入工坊...</p>
-        <p className="text-[10px] text-slate-400 mt-2 font-serif">凭密钥即可进入，无需密码</p>
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ repeat: Infinity, duration: 20, ease: "linear" }}
+          className="text-6xl mb-8 opacity-80"
+        >
+          🧶
+        </motion.div>
+        <p className="text-sm text-slate-500 font-serif mb-4">{loadingProgress.text}</p>
+
+        {/* 动态进度条 */}
+        <div className="w-48 h-1.5 bg-slate-200 rounded-full overflow-hidden mb-2 relative">
+          <motion.div
+            className="absolute top-0 left-0 bottom-0 bg-[#e1a6ad]"
+            initial={{ width: '0%' }}
+            animate={{ width: `${loadingProgress.percent}%` }}
+            transition={{ ease: "easeOut", duration: 0.3 }}
+          />
+        </div>
+        <p className="text-[10px] text-slate-400 mt-2 font-serif opacity-70">
+          无需密码，凭通行刻印即将进入
+        </p>
+
         {loginError && <p className="mt-4 text-xs text-red-500 text-center max-w-xs">{loginError}</p>}
       </div>
     );
@@ -214,7 +238,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onAutoLogin, 
         >
           🧶
         </motion.div>
-        
+
         <div className="space-y-4 text-center">
           <p className="text-lg font-serif">世界太快了。</p>
           <p className="text-lg font-serif">你也累了吧？</p>
@@ -228,7 +252,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onAutoLogin, 
           transition={{ delay: 5 }}
           className="pt-24 flex flex-col items-center"
         >
-          <div 
+          <div
             className="relative w-20 h-20 flex items-center justify-center cursor-pointer select-none"
             onMouseDown={() => isLoading || setIsPressing(true)}
             onMouseUp={() => setIsPressing(false)}
@@ -237,18 +261,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onAutoLogin, 
             onTouchEnd={() => setIsPressing(false)}
           >
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-               <motion.div 
+              <motion.div
                 className="w-20 h-20 rounded-full border-2 border-[#e1a6ad] opacity-30"
                 animate={{ scale: [1, 1.2, 1] }}
                 transition={{ repeat: Infinity, duration: 2 }}
-               />
+              />
             </div>
             <button className="relative z-10 w-16 h-16 bg-white rounded-full shadow-lg flex items-center justify-center text-2xl active:scale-90 transition-transform pointer-events-none">
               🌀
             </button>
             {isPressing && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <motion.div 
+                <motion.div
                   animate={{ scale: [1, 1.5], opacity: [0.5, 0] }}
                   transition={{ repeat: Infinity, duration: 1 }}
                   className="w-16 h-16 rounded-full border-2 border-[#e1a6ad]"
@@ -279,7 +303,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onAutoLogin, 
         >
           🌱
         </motion.div>
-        
+
         <div className="space-y-6 text-center">
           <h2 className="text-3xl font-black text-slate-800 italic">你好，有缘人</h2>
           <p className="text-sm font-serif italic text-slate-500">你的时间，值得变成摸得着的温柔。</p>
@@ -361,14 +385,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onAutoLogin, 
         className="w-full max-w-xs space-y-8"
       >
         <div className="space-y-2 text-center">
-           <p className="font-serif text-lg italic text-slate-700">
-             {validToken ? '有缘人，请落款' : '在这本《织梦手记》里，'}
-           </p>
-           {preUserNickname && (
-             <p className="font-serif text-lg italic text-rose-500">
-               我们该如何称呼你，{preUserNickname}？
-             </p>
-           )}
+          <p className="font-serif text-lg italic text-slate-700">
+            {validToken ? '有缘人，请落款' : '在这本《织梦手记》里，'}
+          </p>
+          {preUserNickname && (
+            <p className="font-serif text-lg italic text-rose-500">
+              我们该如何称呼你，{preUserNickname}？
+            </p>
+          )}
         </div>
 
         {validating ? (
@@ -379,7 +403,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onAutoLogin, 
         ) : (
           <div className="space-y-4">
             <div className="relative">
-              <input 
+              <input
                 type="text"
                 value={name}
                 onChange={(e) => { setName(e.target.value); setLoginError(''); }}
@@ -397,9 +421,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onAutoLogin, 
             <motion.button
               onClick={handleSubmit}
               disabled={isLoading}
-              className={`w-full py-4 rounded-2xl font-black uppercase tracking-[0.2em] shadow-xl transition-all flex items-center justify-center gap-2 ${
-                isLoading ? 'bg-slate-100 text-slate-300' : 'bg-slate-900 text-white active:translate-y-1'
-              }`}
+              className={`w-full py-4 rounded-2xl font-black uppercase tracking-[0.2em] shadow-xl transition-all flex items-center justify-center gap-2 ${isLoading ? 'bg-slate-100 text-slate-300' : 'bg-slate-900 text-white active:translate-y-1'
+                }`}
             >
               {isLoading ? '...' : '落款并登录'}
             </motion.button>
