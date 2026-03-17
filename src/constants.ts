@@ -39,8 +39,8 @@ export const SKILL_PATHS: SkillPath[] = [
 ];
 
 export const GUILD_SHOP: ShopItem[] = [
-  { id: 's1', name: '治愈币', description: '哎呀小熊受伤了？请师傅修补一次。', cost: 100, icon: '🧶' },
-  { id: 's2', name: '扭蛋代币', description: '随机获得精致记号扣或贴纸。', cost: 300, icon: '🧿' },
-  { id: 's3', name: '全糖奶茶券', description: '辛苦了！兑换一杯店长特调奶茶。', cost: 2000, icon: '🏅' },
-  { id: 's4', name: '禁忌图解', description: '兑换一份非公开的极高难度网红卷。', cost: 1000, icon: '📜' }
+  { id: 's1', name: '一团毛线', description: '兑换一团优质毛线，手感也更高级。', cost: 1000, icon: '🧶' },
+  { id: 's2', name: '中级徽章', description: '兑换一枚lv3-lv6徽章。', cost: 2000, icon: '🧿' },
+  { id: 's3', name: '高级徽章', description: '兑换一枚lv7-lv9徽章。', cost: 6000, icon: '🏅' },
+  { id: 's4', name: '禁忌图解', description: '兑换一份非公开的极高难度图解', cost: 9999, icon: '📜' }
 ];
