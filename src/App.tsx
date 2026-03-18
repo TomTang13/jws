@@ -10,7 +10,7 @@ import { StatPage } from '../components/StatPage';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase, testConnection } from './supabase';
 import { signUp, signIn, signInWithPasswordOnly, signOut, syncKeyPassword, onAuthChange, getCurrentUser, updateProfile, getTokenBasedPassword, type UserProfile, checkAndUpdateLoginCount, recordLoginHistory } from './auth';
-import { getLevels, getQuests, getShopItems, getUserCompletedQuests, getUserInventory, addQuestRecord, addRedemptionRecord, generateQuestQRCode, verifyQuestQRCode, expireQuestQRCode, cancelQuestQRCode, updateQuestQRCodeStatus, isQuestCompleted, getUserData, generateLevelQRCode, verifyLevelQRCode, completeLevelPromotion, checkLevelPromotionStatus } from './dataService';
+import { getLevels, getQuests, getShopItems, getUserCompletedQuests, getUserInventory, addQuestRecord, addRedemptionRecord, generateQuestQRCode, verifyQuestQRCode, expireQuestQRCode, cancelQuestQRCode, updateQuestQRCodeStatus, isQuestCompleted, batchCheckQuestStatuses, getUserData, generateLevelQRCode, verifyLevelQRCode, completeLevelPromotion, checkLevelPromotionStatus } from './dataService';
 
 const App: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
@@ -49,6 +49,7 @@ const App: React.FC = () => {
   const [targetLevel, setTargetLevel] = useState<number>(1);
   const [scannedLevelData, setScannedLevelData] = useState<{ userId: string; currentLevel: number; targetLevel: number; qrCodeId: string }>({ userId: '', currentLevel: 0, targetLevel: 0, qrCodeId: '' });
   const [showLevelVerifyConfirm, setShowLevelVerifyConfirm] = useState(false);
+  const [isExamExpanded, setIsExamExpanded] = useState(false);
 
   // 初始化
   useEffect(() => {
@@ -189,17 +190,19 @@ const App: React.FC = () => {
     // 优先用传入的 questList（含真实 UUID），兜底才用 state 里的 quests
     const questsToCheck = (questList && questList.length > 0) ? questList : quests;
 
-    // 对于每个任务，检查其完成状态（只处理有效 UUID 的任务）
+    // 使用批量查询检查任务状态，减少数据库请求次数
     const completedQuests = [];
-    for (const quest of questsToCheck) {
-      // 跳过明显不是 UUID 的 ID（如本地常量 d1/d2/l1 等），避免数据库报错
-      const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      if (!uuidPattern.test(quest.id)) continue;
-
-      const isCompleted = await isQuestCompleted(userId, quest.id, quest.type);
-      if (isCompleted) {
-        completedQuests.push(quest.id);
+    if (questsToCheck.length > 0) {
+      console.log('开始批量检查任务状态...');
+      const questStatuses = await batchCheckQuestStatuses(userId, questsToCheck);
+      
+      // 收集已完成的任务ID
+      for (const quest of questsToCheck) {
+        if (questStatuses[quest.id]) {
+          completedQuests.push(quest.id);
+        }
       }
+      console.log('批量检查任务状态完成，已完成任务数:', completedQuests.length);
     }
 
     setCompletedQuests(completedQuests);
@@ -752,10 +755,19 @@ const App: React.FC = () => {
               这是您今天 {dailyLoginCount}/{dailyLoginLimit} 次进入织梦手记
             </p>
           </div>
-          <div className="flex flex-col items-end gap-1">
+          <div className="flex items-center gap-2">
             <div className="px-3 py-1 bg-amber-50 text-amber-700 rounded-full text-[10px] font-bold border border-amber-100 shadow-sm">
               织梦币: {user?.yc || 0}
             </div>
+            {user?.is_master && (
+              <button
+                onClick={() => setShowScanner(true)}
+                className="p-2 bg-slate-800 text-white rounded-full shadow-lg hover:bg-slate-700 transition-colors"
+                title="扫一扫（师傅核验）"
+              >
+                📷
+              </button>
+            )}
           </div>
         </div>
         <div className="space-y-1">
@@ -791,7 +803,22 @@ const App: React.FC = () => {
                 </div>
                 <div className="p-5 bg-[#fefcf9] rounded-xl border border-dashed border-slate-200">
                   <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 italic">本阶里程碑作品</h3>
-                  <p className="text-sm font-medium leading-relaxed text-slate-700">"{currentLevelData.exam}"</p>
+                  <p className={`text-sm font-medium leading-relaxed text-slate-700 ${isExamExpanded ? '' : 'line-clamp-2'} transition-all duration-300`}>
+                    "{currentLevelData.exam.split('\n').map((line, index) => (
+                      <React.Fragment key={index}>
+                        {line}
+                        {index < currentLevelData.exam.split('\n').length - 1 && <br />}
+                      </React.Fragment>
+                    ))}"
+                  </p>
+                  {currentLevelData.exam && currentLevelData.exam.length > 40 && (
+                    <button
+                      onClick={() => setIsExamExpanded(!isExamExpanded)}
+                      className="text-[10px] font-bold mt-1 opacity-60 hover:opacity-100 transition-opacity text-slate-600"
+                    >
+                      {isExamExpanded ? '收起 ∧' : '更多 ∨'}
+                    </button>
+                  )}
                 </div>
                 <button
                   onClick={handleAscend}
@@ -908,12 +935,14 @@ const App: React.FC = () => {
               <p className="text-[10px] mt-2 text-rose-500 font-bold uppercase tracking-widest">{user?.play_style || 'Hybrid'} 流派修行中</p>
 
               <div className="mt-8 pt-8 border-t flex flex-col gap-4">
-                <button
-                  onClick={() => setActiveTab('stat')}
-                  className="w-full py-4 bg-slate-50 border rounded-2xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors flex items-center justify-center gap-2"
-                >
-                  📊 织梦统计 (全局)
-                </button>
+                {user?.is_master && (
+                  <button
+                    onClick={() => setActiveTab('stat')}
+                    className="w-full py-4 bg-slate-50 border rounded-2xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors flex items-center justify-center gap-2"
+                  >
+                    📊 织梦统计 (全局)
+                  </button>
+                )}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -943,8 +972,20 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {activeTab === 'stat' && (
+        {activeTab === 'stat' && user?.is_master && (
           <StatPage onBack={() => setActiveTab('profile')} />
+        )}
+        {activeTab === 'stat' && !user?.is_master && (
+          <div className="flex flex-col items-center justify-center min-h-[400px]">
+            <div className="text-4xl mb-4">🔒</div>
+            <p className="text-slate-400 font-serif">此功能仅对工坊主理人开放</p>
+            <button
+              onClick={() => setActiveTab('profile')}
+              className="mt-6 px-6 py-2 bg-slate-800 text-white rounded-full text-xs font-bold tracking-widest shadow-xl active:scale-95 transition-all"
+            >
+              返回个人中心
+            </button>
+          </div>
         )}
       </main>
 
@@ -1142,13 +1183,7 @@ const App: React.FC = () => {
             exit={{ opacity: 0, y: 20 }}
             className="fixed bottom-8 right-8 z-40"
           >
-            <button
-              onClick={() => setShowScanner(true)}
-              className="bg-emerald-600 text-white px-6 py-3 rounded-full shadow-lg flex items-center gap-2 active:scale-95 transition-all"
-            >
-              <span className="text-lg">📱</span>
-              <span className="font-bold">师傅核验</span>
-            </button>
+
           </motion.div>
         )}
         {showVerifyConfirm && (
@@ -1201,7 +1236,14 @@ const App: React.FC = () => {
               </div>
               <div className="bg-[#fefaf6] p-6 rounded-2xl text-sm leading-relaxed text-slate-800 border border-amber-100">
                 <p className="text-[10px] font-bold text-slate-400 uppercase mb-3 tracking-widest">掌门核验课题</p>
-                <p className="font-serif italic text-xl leading-snug">"{currentLevelData.exam}"</p>
+                <p className="font-serif italic text-xl leading-snug">
+                  "{currentLevelData.exam.split('\n').map((line, index) => (
+                    <React.Fragment key={index}>
+                      {line}
+                      {index < currentLevelData.exam.split('\n').length - 1 && <br />}
+                    </React.Fragment>
+                  ))}"
+                </p>
               </div>
               <div className="space-y-4 pt-4">
                 <button

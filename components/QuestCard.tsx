@@ -55,7 +55,12 @@ export const QuestCard: React.FC<QuestCardProps> = ({ quest, playerLevel, isComp
 
         <div className="mb-4">
           <p className={`text-xs opacity-75 leading-relaxed ${isExpanded ? '' : 'line-clamp-2'} transition-all duration-300`}>
-            {quest.description}
+            {quest.description.split('\n').map((line, index) => (
+              <React.Fragment key={index}>
+                {line}
+                {index < quest.description.split('\n').length - 1 && <br />}
+              </React.Fragment>
+            ))}
           </p>
           {quest.description && quest.description.length > 40 && (
             <button

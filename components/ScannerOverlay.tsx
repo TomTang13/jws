@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
 import { Html5Qrcode } from 'html5-qrcode';
 
 interface ScannerOverlayProps {
@@ -10,9 +10,16 @@ interface ScannerOverlayProps {
 export const ScannerOverlay: React.FC<ScannerOverlayProps> = ({ onScan, onClose }) => {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const scannerRef = useRef<Html5Qrcode | null>(null);
 
   useEffect(() => {
+    let scanner: Html5Qrcode | null = null;
+
+    const cleanup = () => {
+      if (scanner) {
+        scanner.stop().catch(console.error);
+      }
+    };
+
     async function setupScanner() {
       try {
         // Check if camera API is available
@@ -33,8 +40,7 @@ export const ScannerOverlay: React.FC<ScannerOverlayProps> = ({ onScan, onClose 
         }
 
         // Create scanner instance
-        const scanner = new Html5Qrcode('qr-reader');
-        scannerRef.current = scanner;
+        scanner = new Html5Qrcode('qr-reader');
 
         // Start scanning
         let isScanned = false;
@@ -42,19 +48,18 @@ export const ScannerOverlay: React.FC<ScannerOverlayProps> = ({ onScan, onClose 
           { facingMode: 'environment' },
           {
             fps: 10,
-            qrbox: { width: 250, height: 250 },
-            aspectRatio: 1
+            qrbox: { width: 250, height: 250 }
           },
           (decodedText) => {
             // Scan success
             if (!isScanned) {
               isScanned = true;
               onScan(decodedText);
-              // 同步暂停扫描，防止后续多余回调
-              scanner.pause(true);
+              // 停止扫描
+              scanner?.stop().catch(console.error);
             }
           },
-          () => {
+          (errorMessage) => {
             // QR code not found in this frame, continue scanning
           }
         );
@@ -69,12 +74,7 @@ export const ScannerOverlay: React.FC<ScannerOverlayProps> = ({ onScan, onClose 
 
     setupScanner();
 
-    return () => {
-      // Cleanup
-      if (scannerRef.current) {
-        scannerRef.current.stop().catch(console.error);
-      }
-    };
+    return cleanup;
   }, [onScan]);
 
   return (
@@ -85,35 +85,29 @@ export const ScannerOverlay: React.FC<ScannerOverlayProps> = ({ onScan, onClose 
       className="fixed inset-0 z-[100] bg-black flex flex-col"
     >
       {/* Scanner View */}
-      <div className="relative flex-1 bg-slate-900 flex items-center justify-center overflow-hidden">
+      <div className="relative flex-1 bg-slate-900 overflow-hidden">
         {/* QR Reader Container */}
         <div
           id="qr-reader"
           className="absolute inset-0"
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}
         />
 
         {/* Camera permission states */}
         {hasPermission === null && (
-          <div className="text-white text-center p-8 z-20">
-            <div className="text-xl mb-4">正在启用法术...</div>
-            <p className="text-sm opacity-60 font-serif">正在连接灵目</p>
+          <div className="absolute inset-0 flex items-center justify-center z-20">
+            <div className="text-white text-center p-8">
+              <div className="text-xl mb-4">正在启用法术...</div>
+              <p className="text-sm opacity-60 font-serif">正在连接灵目</p>
+            </div>
           </div>
         )}
 
         {hasPermission === false && (
-          <div className="text-white text-center p-8 z-20">
-            <p className="text-xl mb-4">无法开启灵目</p>
-            <p className="text-sm opacity-60 font-serif">{error || '请在系统设置中允许开启相机权限'}</p>
+          <div className="absolute inset-0 flex items-center justify-center z-20">
+            <div className="text-white text-center p-8">
+              <p className="text-xl mb-4">无法开启灵目</p>
+              <p className="text-sm opacity-60 font-serif">{error || '请在系统设置中允许开启相机权限'}</p>
+            </div>
           </div>
         )}
 
@@ -132,7 +126,7 @@ export const ScannerOverlay: React.FC<ScannerOverlayProps> = ({ onScan, onClose 
           />
         </div>
 
-        <p className="absolute bottom-24 text-white text-xs font-bold tracking-[0.3em] uppercase opacity-60 z-20">
+        <p className="absolute bottom-24 left-0 right-0 text-center text-white text-xs font-bold tracking-[0.3em] uppercase opacity-60 z-20">
           对准工坊二维码
         </p>
       </div>

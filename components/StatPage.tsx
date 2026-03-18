@@ -13,9 +13,18 @@ export const StatPage: React.FC<StatPageProps> = ({ onBack }) => {
 
     useEffect(() => {
         async function fetchData() {
-            const data = await getGlobalStats();
-            setStats(data);
-            setLoading(false);
+            try {
+                console.log('开始获取全局统计数据...');
+                const data = await getGlobalStats();
+                console.log('获取全局统计数据成功:', data);
+                setStats(data);
+            } catch (error) {
+                console.error('获取全局统计数据失败:', error);
+                setStats({ logins: [], quests: [], levels: [] });
+            } finally {
+                setLoading(false);
+                console.log('统计数据加载完成');
+            }
         }
         fetchData();
     }, []);
