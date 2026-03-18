@@ -275,33 +275,64 @@ export async function generateQuestQRCode(
   console.log('二维码URL生成成功:', qrCodeUrl);
 
   try {
-    // 同步保存二维码到数据库
-    console.log('保存二维码到数据库...');
-    const { data, error } = await supabase
-      .from('quest_qr_codes')
-      .insert({
+    // 添加页面可见性监听器
+    let visibilityChangeHandler: () => void;
+    
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('页面重新获得焦点，继续执行数据库操作');
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    try {
+      // 同步保存二维码到数据库
+      console.log('保存二维码到数据库...');
+      console.log('数据库操作参数:', {
         quest_template_id: questId,
-        qr_code_content: qrCodeContent,
-        qr_code_url: qrCodeUrl,
         user_id: userId,
         status: 'generated'
-      })
-      .select('id')
-      .single();
+      });
+      
+      console.log('开始执行 supabase 数据库操作...');
+      const startTime = Date.now();
+      
+      const { data, error } = await supabase
+        .from('quest_qr_codes')
+        .insert({
+          quest_template_id: questId,
+          qr_code_content: qrCodeContent,
+          qr_code_url: qrCodeUrl,
+          user_id: userId,
+          status: 'generated'
+        })
+        .select('id')
+        .single();
+      
+      const endTime = Date.now();
+      console.log('supabase 数据库操作执行完成，耗时:', endTime - startTime, 'ms');
+      
+      if (error || !data) {
+        console.error('数据库保存失败:', error);
+        console.error('错误详情:', error?.message, error?.stack);
+        // 即使数据库保存失败，也返回一个临时ID
+        const tempQrCodeId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        console.log('使用临时二维码ID:', tempQrCodeId);
+        return { qrCodeUrl, qrCodeContent, qrCodeId: tempQrCodeId };
+      }
 
-    if (error || !data) {
-      console.error('数据库保存失败:', error);
-      // 即使数据库保存失败，也返回一个临时ID
-      const tempQrCodeId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      console.log('使用临时二维码ID:', tempQrCodeId);
-      return { qrCodeUrl, qrCodeContent, qrCodeId: tempQrCodeId };
+      console.log('数据库保存成功，二维码ID:', data.id);
+      console.log('二维码生成完成，返回结果');
+      return { qrCodeUrl, qrCodeContent, qrCodeId: data.id };
+    } finally {
+      // 移除页面可见性监听器
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      console.log('页面可见性监听器已移除');
     }
-
-    console.log('数据库保存成功，二维码ID:', data.id);
-    console.log('二维码生成完成，返回结果');
-    return { qrCodeUrl, qrCodeContent, qrCodeId: data.id };
-  } catch (error) {
+  } catch (error: any) {
     console.error('生成二维码异常:', error);
+    console.error('异常详情:', error.message, error.stack);
     // 即使出现异常，也返回一个临时ID
     const tempQrCodeId = `temp_error_${Date.now()}`;
     console.log('使用临时二维码ID:', tempQrCodeId);
