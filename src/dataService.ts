@@ -274,32 +274,39 @@ export async function generateQuestQRCode(
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrCodeContent)}`;
   console.log('二维码URL生成成功:', qrCodeUrl);
 
-  // 生成临时二维码ID
-  const qrCodeId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  console.log('二维码ID生成成功:', qrCodeId);
+  try {
+    // 同步保存二维码到数据库
+    console.log('保存二维码到数据库...');
+    const { data, error } = await supabase
+      .from('quest_qr_codes')
+      .insert({
+        quest_template_id: questId,
+        qr_code_content: qrCodeContent,
+        qr_code_url: qrCodeUrl,
+        user_id: userId,
+        status: 'generated'
+      })
+      .select('id')
+      .single();
 
-  // 立即返回结果，不进行数据库操作
-  // 数据库操作可以在后台异步进行，不影响用户体验
-  setTimeout(async () => {
-    try {
-      console.log('后台保存二维码到数据库...');
-      await supabase
-        .from('quest_qr_codes')
-        .insert({
-          quest_template_id: questId,
-          qr_code_content: qrCodeContent,
-          qr_code_url: qrCodeUrl,
-          user_id: userId,
-          status: 'generated'
-        });
-      console.log('后台数据库保存完成');
-    } catch (dbError) {
-      console.error('后台数据库保存失败:', dbError);
+    if (error || !data) {
+      console.error('数据库保存失败:', error);
+      // 即使数据库保存失败，也返回一个临时ID
+      const tempQrCodeId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      console.log('使用临时二维码ID:', tempQrCodeId);
+      return { qrCodeUrl, qrCodeContent, qrCodeId: tempQrCodeId };
     }
-  }, 0);
 
-  console.log('二维码生成完成，返回结果');
-  return { qrCodeUrl, qrCodeContent, qrCodeId };
+    console.log('数据库保存成功，二维码ID:', data.id);
+    console.log('二维码生成完成，返回结果');
+    return { qrCodeUrl, qrCodeContent, qrCodeId: data.id };
+  } catch (error) {
+    console.error('生成二维码异常:', error);
+    // 即使出现异常，也返回一个临时ID
+    const tempQrCodeId = `temp_error_${Date.now()}`;
+    console.log('使用临时二维码ID:', tempQrCodeId);
+    return { qrCodeUrl, qrCodeContent, qrCodeId: tempQrCodeId };
+  }
 }
 
 // 验证任务二维码
