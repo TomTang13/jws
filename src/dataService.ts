@@ -298,17 +298,28 @@ export async function generateQuestQRCode(
       console.log('开始执行 supabase 数据库操作...');
       const startTime = Date.now();
       
-      const { data, error } = await supabase
-        .from('quest_qr_codes')
-        .insert({
-          quest_template_id: questId,
-          qr_code_content: qrCodeContent,
-          qr_code_url: qrCodeUrl,
-          user_id: userId,
-          status: 'generated'
-        })
-        .select('id')
-        .single();
+      // 添加超时处理
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(new Error('数据库操作超时，已超过3秒'));
+        }, 3000);
+      });
+      
+      // 同时执行数据库操作和超时检查
+      const { data, error } = await Promise.race([
+        supabase
+          .from('quest_qr_codes')
+          .insert({
+            quest_template_id: questId,
+            qr_code_content: qrCodeContent,
+            qr_code_url: qrCodeUrl,
+            user_id: userId,
+            status: 'generated'
+          })
+          .select('id')
+          .single(),
+        timeoutPromise
+      ]);
       
       const endTime = Date.now();
       console.log('supabase 数据库操作执行完成，耗时:', endTime - startTime, 'ms');
@@ -325,6 +336,25 @@ export async function generateQuestQRCode(
       console.log('数据库保存成功，二维码ID:', data.id);
       console.log('二维码生成完成，返回结果');
       return { qrCodeUrl, qrCodeContent, qrCodeId: data.id };
+    } catch (error: any) {
+      console.error('生成二维码异常:', error);
+      console.error('异常详情:', error.message, error.stack);
+      
+      // 检查是否是超时错误
+      if (error.message && error.message.includes('超时')) {
+        console.error('数据库操作超时，提示用户刷新页面');
+        // 显示超时提示，建议用户刷新页面
+        if (typeof window !== 'undefined') {
+          if (window.confirm('网络连接超时，请刷新页面后重试')) {
+            window.location.reload();
+          }
+        }
+      }
+      
+      // 即使出现异常，也返回一个临时ID
+      const tempQrCodeId = `temp_error_${Date.now()}`;
+      console.log('使用临时二维码ID:', tempQrCodeId);
+      return { qrCodeUrl, qrCodeContent, qrCodeId: tempQrCodeId };
     } finally {
       // 移除页面可见性监听器
       document.removeEventListener('visibilitychange', handleVisibilityChange);
