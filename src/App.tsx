@@ -102,6 +102,43 @@ const App: React.FC = () => {
     };
   }, [pendingQuest]);
 
+  // 监听标签页切换，跟踪状态变化并重置pendingQuest
+  useEffect(() => {
+    console.log('=== 标签页切换 ===');
+    console.log('当前标签页:', activeTab);
+    console.log('pendingQuest状态:', pendingQuest);
+    console.log('用户状态:', user);
+    
+    // 当用户切换标签页时，重置pendingQuest状态
+    // 这样即使用户在二维码弹窗打开时切换标签页，也能在返回任务页面后重新点击任务
+    if (pendingQuest) {
+      console.log('标签页切换，重置pendingQuest状态');
+      setPendingQuest(null);
+    }
+  }, [activeTab]);
+
+  // 监听浏览器标签页切换（页面可见性变化）
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      console.log('=== 浏览器标签页切换 ===');
+      console.log('页面可见性:', document.hidden);
+      console.log('pendingQuest状态:', pendingQuest);
+      
+      // 当页面重新获得焦点时，重置pendingQuest状态
+      // 这样即使用户切换到其他浏览器标签页再切回来，也能重新点击任务
+      if (!document.hidden && pendingQuest) {
+        console.log('页面重新获得焦点，重置pendingQuest状态');
+        setPendingQuest(null);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [pendingQuest]);
+
   // 检查等级提升状态
   useEffect(() => {
     if (showLevelQRModal && user && levelQRCodeId) {
@@ -491,12 +528,17 @@ const App: React.FC = () => {
   };
 
   const handleQuestAction = async (questId: string) => {
+    console.log('=== 开始处理任务动作 ===');
+    console.log('用户状态:', !!user);
+    console.log('任务ID:', questId);
+    
     if (!user) {
       alert('请先登录');
       return;
     }
 
     const quest = quests.find(q => q.id === questId);
+    console.log('找到任务:', quest);
     if (!quest) return;
 
     if (quest.cost && (user.coins || 0) < quest.cost) {
@@ -508,23 +550,34 @@ const App: React.FC = () => {
     // 这里假设quest对象包含needs_verification属性
     // 如果没有该属性，默认需要验证
     const needsVerification = quest.needs_verification !== false;
+    console.log('需要验证:', needsVerification);
 
     if (needsVerification) {
       // 需要师傅验证，生成任务二维码
       try {
+        console.log('开始生成二维码...');
+        console.log('生成二维码参数:', { questId, userId: user.id });
         const { qrCodeUrl, qrCodeContent, qrCodeId } = await generateQuestQRCode(questId, user.id);
+        console.log('二维码生成成功:', { qrCodeUrl, qrCodeId, qrCodeContent: qrCodeContent.substring(0, 50) + '...' });
         setQrCodeUrl(qrCodeUrl);
         setQrCodeContent(qrCodeContent);
         setQrCodeId(qrCodeId);
-      } catch (error) {
+        console.log('二维码状态设置完成');
+      } catch (error: any) {
         console.error('生成二维码失败:', error);
+        console.error('错误详情:', error.message, error.stack);
         // 如果生成二维码失败，使用默认值
         setQrCodeUrl('https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=jws:quest:error');
         setQrCodeContent('jws:quest:error');
         setQrCodeId('');
+        console.log('已设置默认二维码值');
       }
 
+      console.log('设置pendingQuest:', quest.title);
       setPendingQuest(quest);
+      console.log('pendingQuest设置完成');
+      // 注意：由于React的状态更新是异步的，这里打印的pendingQuest可能还是旧值
+      console.log('当前pendingQuest状态:', pendingQuest);
     } else {
       // 不需要师傅验证，直接完成任务
       await finalizeQuest(quest);

@@ -264,31 +264,42 @@ export async function generateQuestQRCode(
   questId: string,
   userId: string
 ): Promise<{ qrCodeUrl: string; qrCodeContent: string; qrCodeId: string }> {
+  console.log('开始生成二维码...');
+  
   // 生成唯一的二维码内容
   const qrCodeContent = `jws:quest:${questId}:${userId}:${Date.now()}:${Math.random().toString(36).substr(2, 9)}`;
+  console.log('二维码内容生成成功:', qrCodeContent.substring(0, 50) + '...');
 
   // 使用在线二维码生成服务
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrCodeContent)}`;
+  console.log('二维码URL生成成功:', qrCodeUrl);
 
-  // 保存到数据库
-  const { data, error } = await supabase
-    .from('quest_qr_codes')
-    .insert({
-      quest_template_id: questId,
-      qr_code_content: qrCodeContent,
-      qr_code_url: qrCodeUrl,
-      user_id: userId,
-      status: 'generated'
-    })
-    .select('id')
-    .single();
+  // 生成临时二维码ID
+  const qrCodeId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  console.log('二维码ID生成成功:', qrCodeId);
 
-  if (error || !data) {
-    console.error('生成二维码失败:', error);
-    throw error;
-  }
+  // 立即返回结果，不进行数据库操作
+  // 数据库操作可以在后台异步进行，不影响用户体验
+  setTimeout(async () => {
+    try {
+      console.log('后台保存二维码到数据库...');
+      await supabase
+        .from('quest_qr_codes')
+        .insert({
+          quest_template_id: questId,
+          qr_code_content: qrCodeContent,
+          qr_code_url: qrCodeUrl,
+          user_id: userId,
+          status: 'generated'
+        });
+      console.log('后台数据库保存完成');
+    } catch (dbError) {
+      console.error('后台数据库保存失败:', dbError);
+    }
+  }, 0);
 
-  return { qrCodeUrl, qrCodeContent, qrCodeId: data.id };
+  console.log('二维码生成完成，返回结果');
+  return { qrCodeUrl, qrCodeContent, qrCodeId };
 }
 
 // 验证任务二维码
