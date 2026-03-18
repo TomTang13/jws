@@ -746,26 +746,68 @@ export async function getGlobalStats() {
   try {
     console.log('开始获取全局统计数据...');
     
-    // 1. 获取最新登录的5个用户 (通过 login_history join profiles)
+    // 1. 获取最新登录的5个unique用户 (通过 login_history join profiles)
     let recentLogins = [];
     try {
+      // 获取所有成功的登录记录
       const { data, error } = await supabase
         .from('login_history')
         .select(`
           login_time,
           status,
+          user_id,
           profiles:user_id (
             nickname
           )
         `)
-        .eq('status', 'success')
-        .order('login_time', { ascending: false })
-        .limit(5);
+        .eq('status', 'success');
       
       if (error) {
         console.error('获取登录统计失败:', error);
-      } else {
-        recentLogins = data || [];
+      } else if (data) {
+        // 按用户ID分组，计算登录次数和最后登录时间
+        const userLoginMap = new Map<string, {
+          userId: string;
+          nickname: string;
+          loginCount: number;
+          lastLoginTime: string;
+        }>();
+        
+        data.forEach(login => {
+          const userId = login.user_id;
+          const nickname = login.profiles?.nickname || '未知用户';
+          const loginTime = login.login_time;
+          
+          if (userLoginMap.has(userId)) {
+            // 更新现有用户的登录次数和最后登录时间
+            const userData = userLoginMap.get(userId)!;
+            userData.loginCount += 1;
+            if (loginTime > userData.lastLoginTime) {
+              userData.lastLoginTime = loginTime;
+            }
+          } else {
+            // 添加新用户
+            userLoginMap.set(userId, {
+              userId,
+              nickname,
+              loginCount: 1,
+              lastLoginTime: loginTime
+            });
+          }
+        });
+        
+        // 转换为数组并按最后登录时间排序
+        const sortedUsers = Array.from(userLoginMap.values())
+          .sort((a, b) => new Date(b.lastLoginTime).getTime() - new Date(a.lastLoginTime).getTime())
+          .slice(0, 5);
+        
+        // 格式化为与之前相同的结构，方便前端使用
+        recentLogins = sortedUsers.map(user => ({
+          login_time: user.lastLoginTime,
+          status: 'success',
+          profiles: { nickname: user.nickname },
+          login_count: user.loginCount
+        }));
       }
     } catch (err) {
       console.error('获取登录统计异常:', err);
