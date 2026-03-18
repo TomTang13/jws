@@ -264,31 +264,110 @@ export async function generateQuestQRCode(
   questId: string,
   userId: string
 ): Promise<{ qrCodeUrl: string; qrCodeContent: string; qrCodeId: string }> {
+  console.log('开始生成二维码...');
+  
   // 生成唯一的二维码内容
   const qrCodeContent = `jws:quest:${questId}:${userId}:${Date.now()}:${Math.random().toString(36).substr(2, 9)}`;
+  console.log('二维码内容生成成功:', qrCodeContent.substring(0, 50) + '...');
 
   // 使用在线二维码生成服务
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrCodeContent)}`;
+  console.log('二维码URL生成成功:', qrCodeUrl);
 
-  // 保存到数据库
-  const { data, error } = await supabase
-    .from('quest_qr_codes')
-    .insert({
-      quest_template_id: questId,
-      qr_code_content: qrCodeContent,
-      qr_code_url: qrCodeUrl,
-      user_id: userId,
-      status: 'generated'
-    })
-    .select('id')
-    .single();
+  try {
+    // 添加页面可见性监听器
+    let visibilityChangeHandler: () => void;
+    
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('页面重新获得焦点，继续执行数据库操作');
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    try {
+      // 同步保存二维码到数据库
+      console.log('保存二维码到数据库...');
+      console.log('数据库操作参数:', {
+        quest_template_id: questId,
+        user_id: userId,
+        status: 'generated'
+      });
+      
+      console.log('开始执行 supabase 数据库操作...');
+      const startTime = Date.now();
+      
+      // 添加超时处理
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(new Error('数据库操作超时，已超过3秒'));
+        }, 3000);
+      });
+      
+      // 同时执行数据库操作和超时检查
+      const { data, error } = await Promise.race([
+        supabase
+          .from('quest_qr_codes')
+          .insert({
+            quest_template_id: questId,
+            qr_code_content: qrCodeContent,
+            qr_code_url: qrCodeUrl,
+            user_id: userId,
+            status: 'generated'
+          })
+          .select('id')
+          .single(),
+        timeoutPromise
+      ]);
+      
+      const endTime = Date.now();
+      console.log('supabase 数据库操作执行完成，耗时:', endTime - startTime, 'ms');
+      
+      if (error || !data) {
+        console.error('数据库保存失败:', error);
+        console.error('错误详情:', error?.message, error?.stack);
+        // 即使数据库保存失败，也返回一个临时ID
+        const tempQrCodeId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        console.log('使用临时二维码ID:', tempQrCodeId);
+        return { qrCodeUrl, qrCodeContent, qrCodeId: tempQrCodeId };
+      }
 
-  if (error || !data) {
-    console.error('生成二维码失败:', error);
-    throw error;
+      console.log('数据库保存成功，二维码ID:', data.id);
+      console.log('二维码生成完成，返回结果');
+      return { qrCodeUrl, qrCodeContent, qrCodeId: data.id };
+    } catch (error: any) {
+      console.error('生成二维码异常:', error);
+      console.error('异常详情:', error.message, error.stack);
+      
+      // 检查是否是超时错误
+      if (error.message && error.message.includes('超时')) {
+        console.error('数据库操作超时，提示用户刷新页面');
+        // 显示超时提示，建议用户刷新页面
+        if (typeof window !== 'undefined') {
+          if (window.confirm('网络连接超时，请刷新页面后重试')) {
+            window.location.reload();
+          }
+        }
+      }
+      
+      // 即使出现异常，也返回一个临时ID
+      const tempQrCodeId = `temp_error_${Date.now()}`;
+      console.log('使用临时二维码ID:', tempQrCodeId);
+      return { qrCodeUrl, qrCodeContent, qrCodeId: tempQrCodeId };
+    } finally {
+      // 移除页面可见性监听器
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      console.log('页面可见性监听器已移除');
+    }
+  } catch (error: any) {
+    console.error('生成二维码异常:', error);
+    console.error('异常详情:', error.message, error.stack);
+    // 即使出现异常，也返回一个临时ID
+    const tempQrCodeId = `temp_error_${Date.now()}`;
+    console.log('使用临时二维码ID:', tempQrCodeId);
+    return { qrCodeUrl, qrCodeContent, qrCodeId: tempQrCodeId };
   }
-
-  return { qrCodeUrl, qrCodeContent, qrCodeId: data.id };
 }
 
 // 验证任务二维码
@@ -667,26 +746,68 @@ export async function getGlobalStats() {
   try {
     console.log('开始获取全局统计数据...');
     
-    // 1. 获取最新登录的5个用户 (通过 login_history join profiles)
+    // 1. 获取最新登录的5个unique用户 (通过 login_history join profiles)
     let recentLogins = [];
     try {
+      // 获取所有成功的登录记录
       const { data, error } = await supabase
         .from('login_history')
         .select(`
           login_time,
           status,
+          user_id,
           profiles:user_id (
             nickname
           )
         `)
-        .eq('status', 'success')
-        .order('login_time', { ascending: false })
-        .limit(5);
+        .eq('status', 'success');
       
       if (error) {
         console.error('获取登录统计失败:', error);
-      } else {
-        recentLogins = data || [];
+      } else if (data) {
+        // 按用户ID分组，计算登录次数和最后登录时间
+        const userLoginMap = new Map<string, {
+          userId: string;
+          nickname: string;
+          loginCount: number;
+          lastLoginTime: string;
+        }>();
+        
+        data.forEach(login => {
+          const userId = login.user_id;
+          const nickname = login.profiles?.nickname || '未知用户';
+          const loginTime = login.login_time;
+          
+          if (userLoginMap.has(userId)) {
+            // 更新现有用户的登录次数和最后登录时间
+            const userData = userLoginMap.get(userId)!;
+            userData.loginCount += 1;
+            if (loginTime > userData.lastLoginTime) {
+              userData.lastLoginTime = loginTime;
+            }
+          } else {
+            // 添加新用户
+            userLoginMap.set(userId, {
+              userId,
+              nickname,
+              loginCount: 1,
+              lastLoginTime: loginTime
+            });
+          }
+        });
+        
+        // 转换为数组并按最后登录时间排序
+        const sortedUsers = Array.from(userLoginMap.values())
+          .sort((a, b) => new Date(b.lastLoginTime).getTime() - new Date(a.lastLoginTime).getTime())
+          .slice(0, 5);
+        
+        // 格式化为与之前相同的结构，方便前端使用
+        recentLogins = sortedUsers.map(user => ({
+          login_time: user.lastLoginTime,
+          status: 'success',
+          profiles: { nickname: user.nickname },
+          login_count: user.loginCount
+        }));
       }
     } catch (err) {
       console.error('获取登录统计异常:', err);
