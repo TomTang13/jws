@@ -395,6 +395,68 @@ export async function updateQuestQRCodeStatus(
   }
 }
 
+// 批量检查任务是否已完成（优化性能）
+export async function batchCheckQuestStatuses(
+  userId: string,
+  quests: { id: string; type: string }[]
+): Promise<Record<string, boolean>> {
+  try {
+    // 过滤出有效的UUID任务ID
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const validQuests = quests.filter(quest => uuidPattern.test(quest.id));
+    
+    if (validQuests.length === 0) {
+      return {};
+    }
+
+    // 分离daily和非daily任务
+    const dailyQuestIds = validQuests.filter(q => q.type === 'daily').map(q => q.id);
+    const nonDailyQuestIds = validQuests.filter(q => q.type !== 'daily').map(q => q.id);
+
+    const result: Record<string, boolean> = {};
+
+    // 批量查询非daily任务
+    if (nonDailyQuestIds.length > 0) {
+      const { data: nonDailyData } = await supabase
+        .from('user_quests')
+        .select('quest_template_id')
+        .eq('user_id', userId)
+        .in('quest_template_id', nonDailyQuestIds)
+        .eq('status', 'completed');
+
+      const completedNonDailyIds = new Set(nonDailyData?.map(item => item.quest_template_id) || []);
+      nonDailyQuestIds.forEach(id => {
+        result[id] = completedNonDailyIds.has(id);
+      });
+    }
+
+    // 批量查询daily任务（当天完成的）
+    if (dailyQuestIds.length > 0) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayISO = today.toISOString();
+
+      const { data: dailyData } = await supabase
+        .from('user_quests')
+        .select('quest_template_id')
+        .eq('user_id', userId)
+        .in('quest_template_id', dailyQuestIds)
+        .eq('status', 'completed')
+        .gte('completed_at', todayISO);
+
+      const completedDailyIds = new Set(dailyData?.map(item => item.quest_template_id) || []);
+      dailyQuestIds.forEach(id => {
+        result[id] = completedDailyIds.has(id);
+      });
+    }
+
+    return result;
+  } catch (error) {
+    console.error('批量检查任务状态失败:', error);
+    return {};
+  }
+}
+
 // 检查任务是否已完成
 export async function isQuestCompleted(
   userId: string,
@@ -598,5 +660,102 @@ export async function checkLevelPromotionStatus(
   } catch (error) {
     console.error('检查等级提升状态失败:', error);
     return false;
+  }
+}
+// 获取全局统计数据
+export async function getGlobalStats() {
+  try {
+    console.log('开始获取全局统计数据...');
+    
+    // 1. 获取最新登录的5个用户 (通过 login_history join profiles)
+    let recentLogins = [];
+    try {
+      const { data, error } = await supabase
+        .from('login_history')
+        .select(`
+          login_time,
+          status,
+          profiles:user_id (
+            nickname
+          )
+        `)
+        .eq('status', 'success')
+        .order('login_time', { ascending: false })
+        .limit(5);
+      
+      if (error) {
+        console.error('获取登录统计失败:', error);
+      } else {
+        recentLogins = data || [];
+      }
+    } catch (err) {
+      console.error('获取登录统计异常:', err);
+    }
+
+    // 2. 获取最新完成的5个任务 (通过 user_quests join profiles 和 quest_templates)
+    let recentQuests = [];
+    try {
+      const { data, error } = await supabase
+        .from('user_quests')
+        .select(`
+          completed_at,
+          quest_type,
+          profiles:user_id (
+            nickname
+          ),
+          quest_templates (
+            title
+          )
+        `)
+        .eq('status', 'completed')
+        .order('completed_at', { ascending: false })
+        .limit(5);
+      
+      if (error) {
+        console.error('获取任务统计失败:', error);
+      } else {
+        recentQuests = data || [];
+      }
+    } catch (err) {
+      console.error('获取任务统计异常:', err);
+    }
+
+    // 3. 获取最新完成的5次升级 (通过 level_logs join profiles)
+    let recentLevels = [];
+    try {
+      const { data, error } = await supabase
+        .from('level_logs')
+        .select(`
+          promotion_date,
+          old_level,
+          new_level,
+          profiles:user_id (
+            nickname
+          )
+        `)
+        .eq('status', 'verified')
+        .order('promotion_date', { ascending: false })
+        .limit(5);
+      
+      if (error) {
+        console.error('获取等级统计失败:', error);
+      } else {
+        recentLevels = data || [];
+      }
+    } catch (err) {
+      console.error('获取等级统计异常:', err);
+    }
+
+    const result = {
+      logins: recentLogins,
+      quests: recentQuests,
+      levels: recentLevels
+    };
+    
+    console.log('获取全局统计数据完成:', result);
+    return result;
+  } catch (error) {
+    console.error('获取全局统计异常:', error);
+    return { logins: [], quests: [], levels: [] };
   }
 }
