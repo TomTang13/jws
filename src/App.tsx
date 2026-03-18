@@ -85,6 +85,23 @@ const App: React.FC = () => {
     init();
   }, []);
 
+  // 监听页面卸载事件，重置 pendingQuest 状态
+  useEffect(() => {
+    // 监听页面卸载事件
+    const handleBeforeUnload = () => {
+      // 重置 pendingQuest 状态
+      if (pendingQuest) {
+        setPendingQuest(null);
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [pendingQuest]);
+
   // 检查等级提升状态
   useEffect(() => {
     if (showLevelQRModal && user && levelQRCodeId) {
