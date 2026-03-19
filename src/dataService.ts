@@ -799,7 +799,7 @@ export async function getGlobalStats() {
         // 转换为数组并按最后登录时间排序
         const sortedUsers = Array.from(userLoginMap.values())
           .sort((a, b) => new Date(b.lastLoginTime).getTime() - new Date(a.lastLoginTime).getTime())
-          .slice(0, 5);
+          .slice(0, 10);
         
         // 格式化为与之前相同的结构，方便前端使用
         recentLogins = sortedUsers.map(user => ({
@@ -830,7 +830,7 @@ export async function getGlobalStats() {
         `)
         .eq('status', 'completed')
         .order('completed_at', { ascending: false })
-        .limit(5);
+        .limit(10);
       
       if (error) {
         console.error('获取任务统计失败:', error);
@@ -856,7 +856,7 @@ export async function getGlobalStats() {
         `)
         .eq('status', 'verified')
         .order('promotion_date', { ascending: false })
-        .limit(5);
+        .limit(10);
       
       if (error) {
         console.error('获取等级统计失败:', error);
