@@ -345,7 +345,7 @@ export async function generateQuestQRCode(
         console.error('数据库操作超时，提示用户刷新页面');
         // 显示超时提示，建议用户刷新页面
         if (typeof window !== 'undefined') {
-          if (window.confirm('网络连接超时，请刷新页面后重试')) {
+          if (window.confirm('庭院需要清理，请重新进入')) {
             window.location.reload();
           }
         }
