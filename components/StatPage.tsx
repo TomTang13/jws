@@ -10,6 +10,7 @@ interface StatPageProps {
 export const StatPage: React.FC<StatPageProps> = ({ onBack }) => {
     const [stats, setStats] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [showMore, setShowMore] = useState(false);
 
     useEffect(() => {
         async function fetchData() {
@@ -63,13 +64,21 @@ export const StatPage: React.FC<StatPageProps> = ({ onBack }) => {
                     <span className="text-lg">🕯️</span> 最新登录
                 </h3>
                 <div className="space-y-3">
-                    {stats.logins.map((item: any, i: number) => (
+                    {(showMore ? stats.logins : stats.logins.slice(0, 5)).map((item: any, i: number) => (
                         <div key={i} className="flex justify-between items-center text-xs">
                             <span className="font-bold text-slate-700">{item.profiles.nickname}</span>
                             <span className="text-slate-400 font-mono text-[10px]">{formatDate(item.login_time)}</span>
                         </div>
                     ))}
                     {stats.logins.length === 0 && <p className="text-center text-[10px] text-slate-300 py-4 italic">暂无记录</p>}
+                    {stats.logins.length > 5 && (
+                        <button 
+                            onClick={() => setShowMore(!showMore)} 
+                            className="w-full text-center text-xs text-slate-400 hover:text-slate-600 mt-2"
+                        >
+                            {showMore ? '收起' : '更多'}
+                        </button>
+                    )}
                 </div>
             </section>
 
@@ -79,7 +88,7 @@ export const StatPage: React.FC<StatPageProps> = ({ onBack }) => {
                     <span className="text-lg">📜</span> 最新完成心愿
                 </h3>
                 <div className="space-y-4">
-                    {stats.quests.map((item: any, i: number) => (
+                    {(showMore ? stats.quests : stats.quests.slice(0, 5)).map((item: any, i: number) => (
                         <div key={i} className="flex flex-col gap-1 border-l-2 border-amber-100 pl-3">
                             <div className="flex justify-between items-center">
                                 <span className="text-xs font-bold text-slate-700">{item.profiles.nickname}</span>
@@ -89,6 +98,14 @@ export const StatPage: React.FC<StatPageProps> = ({ onBack }) => {
                         </div>
                     ))}
                     {stats.quests.length === 0 && <p className="text-center text-[10px] text-slate-300 py-4 italic">暂无记录</p>}
+                    {stats.quests.length > 5 && (
+                        <button 
+                            onClick={() => setShowMore(!showMore)} 
+                            className="w-full text-center text-xs text-slate-400 hover:text-slate-600 mt-2"
+                        >
+                            {showMore ? '收起' : '更多'}
+                        </button>
+                    )}
                 </div>
             </section>
 
@@ -98,7 +115,7 @@ export const StatPage: React.FC<StatPageProps> = ({ onBack }) => {
                     <span className="text-lg">✨</span> 灵感突破 (晋升)
                 </h3>
                 <div className="space-y-4">
-                    {stats.levels.map((item: any, i: number) => (
+                    {(showMore ? stats.levels : stats.levels.slice(0, 5)).map((item: any, i: number) => (
                         <div key={i} className="flex items-center justify-between bg-rose-50/30 p-3 rounded-xl border border-rose-100/50">
                             <div className="flex flex-col gap-1">
                                 <span className="text-xs font-bold text-rose-900">{item.profiles.nickname}</span>
@@ -112,6 +129,14 @@ export const StatPage: React.FC<StatPageProps> = ({ onBack }) => {
                         </div>
                     ))}
                     {stats.levels.length === 0 && <p className="text-center text-[10px] text-slate-300 py-4 italic">暂无记录</p>}
+                    {stats.levels.length > 5 && (
+                        <button 
+                            onClick={() => setShowMore(!showMore)} 
+                            className="w-full text-center text-xs text-slate-400 hover:text-slate-600 mt-2"
+                        >
+                            {showMore ? '收起' : '更多'}
+                        </button>
+                    )}
                 </div>
             </section>
         </div>

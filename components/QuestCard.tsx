@@ -91,7 +91,7 @@ export const QuestCard: React.FC<QuestCardProps> = ({ quest, playerLevel, isComp
                       'bg-white border border-current shadow-sm active:scale-95'
               } ${theme.text}`}
           >
-            {isCompleted ? '愿望已达成' : isPending ? '等待师傅核验' : !canAfford ? '灵石不足' : isLocked ? '机缘未到' : '领取心愿'}
+            {isCompleted ? '愿望已达成' : isPending ? '等待师傅核验' : !canAfford ? '灵石不足' : isLocked ? '机缘未到' : '去完成'}
           </button>
         </div>
       </div>
