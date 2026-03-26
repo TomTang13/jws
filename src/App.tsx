@@ -11,6 +11,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { supabase, testConnection } from './supabase';
 import { signUp, signIn, signInWithPasswordOnly, signOut, syncKeyPassword, onAuthChange, getCurrentUser, updateProfile, getTokenBasedPassword, type UserProfile, checkAndUpdateLoginCount, recordLoginHistory } from './auth';
 import { getLevels, getQuests, getShopItems, getUserCompletedQuests, getUserInventory, addQuestRecord, addRedemptionRecord, generateQuestQRCode, verifyQuestQRCode, expireQuestQRCode, cancelQuestQRCode, updateQuestQRCodeStatus, isQuestCompleted, batchCheckQuestStatuses, getUserData, generateLevelQRCode, verifyLevelQRCode, completeLevelPromotion, checkLevelPromotionStatus } from './dataService';
+import { getRandomEncouragement, getLevelName } from './encouragementData';
 
 const App: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
@@ -23,6 +24,7 @@ const App: React.FC = () => {
   const [shopItems, setShopItems] = useState(GUILD_SHOP);
   const [dailyLoginCount, setDailyLoginCount] = useState<number>(1);
   const [dailyLoginLimit, setDailyLoginLimit] = useState<number>(5);
+  const [encouragementMessage, setEncouragementMessage] = useState<string>('');
 
   const [activeTab, setActiveTab] = useState<'map' | 'quests' | 'shop' | 'profile' | 'stat'>('map');
   const [questSubTab, setQuestSubTab] = useState<'daily' | 'labor' | 'patron'>('daily');
@@ -60,6 +62,18 @@ const App: React.FC = () => {
     }
 
     async function init() {
+      // 从 sessionStorage 读取缓存的等级并生成鼓励语句
+      const cachedLevel = sessionStorage.getItem('jws_user_level');
+      if (cachedLevel) {
+        const level = parseInt(cachedLevel, 10) || 1;
+        const message = getRandomEncouragement(level);
+        setEncouragementMessage(message);
+      } else {
+        // 如果没有缓存，默认使用等级1的鼓励语句
+        const message = getRandomEncouragement(1);
+        setEncouragementMessage(message);
+      }
+
       // 测试 Supabase 连接
       const connected = await testConnection();
       setIsConnected(connected);
@@ -264,6 +278,12 @@ const App: React.FC = () => {
     // 更新用户基本信息，包括织梦币和灵感值
     if (userData) {
       setUser(userData);
+      // 缓存等级到 sessionStorage
+      const userLevel = userData.level || 1;
+      sessionStorage.setItem('jws_user_level', userLevel.toString());
+      // 生成并设置鼓励语句
+      const message = getRandomEncouragement(userLevel);
+      setEncouragementMessage(message);
     }
   }
 
@@ -802,11 +822,18 @@ const App: React.FC = () => {
   // 加载中
   if (isLoading) {
     return (
-      <div className="max-w-md mx-auto min-h-screen bg-[#fcfaf7] flex items-center justify-center">
+      <div className="max-w-md mx-auto min-h-screen bg-[#fcfaf7] flex items-center justify-center p-8">
         <div className="text-center">
-          <div className="text-4xl mb-4">🧶</div>
-          <p className="text-slate-600 font-serif">正在连接织梦手记...</p>
-          {!isConnected && <p className="text-xs text-amber-500 mt-2">庭院打扫中</p>}
+          <div className="text-4xl mb-6">🧶</div>
+          <p className="text-slate-600 font-serif mb-8">正在连接织梦手记...</p>
+          {encouragementMessage && (
+            <div className="max-w-xs mx-auto">
+              <p className="text-sm text-slate-500 font-serif italic leading-relaxed">
+                "{encouragementMessage}"
+              </p>
+            </div>
+          )}
+          {!isConnected && <p className="text-xs text-amber-500 mt-6">庭院打扫中</p>}
         </div>
       </div>
     );

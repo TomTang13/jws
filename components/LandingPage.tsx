@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { supabase } from '../src/supabase';
+import { getRandomEncouragement } from '../src/encouragementData';
 
 interface LandingPageProps {
   onLogin: (nickname: string, preUserId: string) => Promise<boolean>;
@@ -20,6 +21,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onAutoLogin, 
   const [loadingProgress, setLoadingProgress] = useState({ percent: 0, text: '启动连接...' });
   const [preUserNickname, setPreUserNickname] = useState<string | null>(null);
   const [preUserId, setPreUserId] = useState<string | null>(null);
+  const [encouragementMessage, setEncouragementMessage] = useState<string>('');
 
   // 验证 token（t 为实物密钥，对应 pre_users.encrypted_string）
   useEffect(() => {
@@ -28,6 +30,21 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onAutoLogin, 
       validateToken(token);
     }
   }, [token]);
+
+  // 生成鼓励语句
+  useEffect(() => {
+    // 从 sessionStorage 读取缓存的等级并生成鼓励语句
+    const cachedLevel = sessionStorage.getItem('jws_user_level');
+    if (cachedLevel) {
+      const level = parseInt(cachedLevel, 10) || 1;
+      const message = getRandomEncouragement(level);
+      setEncouragementMessage(message);
+    } else {
+      // 如果没有缓存，默认使用等级1的鼓励语句
+      const message = getRandomEncouragement(1);
+      setEncouragementMessage(message);
+    }
+  }, []);
 
   // 已使用密钥：验证通过后自动登录（仅凭 t 即可进入，无需密码）
   useEffect(() => {
@@ -199,30 +216,40 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onAutoLogin, 
   // 已使用密钥：只显示「正在进入工坊…」，凭密钥即可进入，无需密码
   if (autoLoggingIn) {
     return (
-      <div className="fixed inset-0 z-[100] bg-[#fdfbf7] flex flex-col items-center justify-center p-8 overflow-hidden paper-texture">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ repeat: Infinity, duration: 20, ease: "linear" }}
-          className="text-6xl mb-8 opacity-80"
-        >
-          🧶
-        </motion.div>
-        <p className="text-sm text-slate-500 font-serif mb-4">{loadingProgress.text}</p>
-
-        {/* 动态进度条 */}
-        <div className="w-48 h-1.5 bg-slate-200 rounded-full overflow-hidden mb-2 relative">
+      <div className="fixed inset-0 z-[100] bg-[#fdfbf7] flex flex-col justify-between items-center p-8 overflow-hidden paper-texture">
+        <div className="text-center mt-20">
           <motion.div
-            className="absolute top-0 left-0 bottom-0 bg-[#e1a6ad]"
-            initial={{ width: '0%' }}
-            animate={{ width: `${loadingProgress.percent}%` }}
-            transition={{ ease: "easeOut", duration: 0.3 }}
-          />
-        </div>
-        <p className="text-[10px] text-slate-400 mt-2 font-serif opacity-70">
-          无需密码，凭通行刻印即将进入
-        </p>
+            animate={{ rotate: 360 }}
+            transition={{ repeat: Infinity, duration: 20, ease: "linear" }}
+            className="text-6xl mb-8 opacity-80"
+          >
+            🧶
+          </motion.div>
+          <p className="text-sm text-slate-500 font-serif mb-4">{loadingProgress.text}</p>
 
-        {loginError && <p className="mt-4 text-xs text-red-500 text-center max-w-xs">{loginError}</p>}
+          {/* 动态进度条 */}
+          <div className="w-48 h-1.5 bg-slate-200 rounded-full overflow-hidden mb-2 relative">
+            <motion.div
+              className="absolute top-0 left-0 bottom-0 bg-[#e1a6ad]"
+              initial={{ width: '0%' }}
+              animate={{ width: `${loadingProgress.percent}%` }}
+              transition={{ ease: "easeOut", duration: 0.3 }}
+            />
+          </div>
+          <p className="text-[10px] text-slate-400 mt-2 font-serif opacity-70">
+            无需密码，凭通行刻印即将进入
+          </p>
+
+          {loginError && <p className="mt-4 text-xs text-red-500 text-center max-w-xs">{loginError}</p>}
+        </div>
+        
+        <div className="max-w-xs mx-auto mb-12 text-center">
+          {encouragementMessage && (
+            <p className="text-base text-slate-700 font-serif italic leading-relaxed">
+              "{encouragementMessage}"
+            </p>
+          )}
+        </div>
       </div>
     );
   }
@@ -396,9 +423,19 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onAutoLogin, 
         </div>
 
         {validating ? (
-          <div className="text-center py-8">
-            <div className="text-2xl mb-4">🔐</div>
-            <p className="text-sm text-slate-500">正在验证邀请码...</p>
+          <div className="flex flex-col justify-between items-center py-8 min-h-[400px]">
+            <div className="text-center">
+              <div className="text-2xl mb-4">🔐</div>
+              <p className="text-sm text-slate-500">正在验证邀请码...</p>
+            </div>
+            
+            <div className="max-w-xs mx-auto text-center">
+              {encouragementMessage && (
+                <p className="text-base text-slate-700 font-serif italic leading-relaxed">
+                  "{encouragementMessage}"
+                </p>
+              )}
+            </div>
           </div>
         ) : (
           <div className="space-y-4">
