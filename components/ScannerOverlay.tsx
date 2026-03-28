@@ -13,10 +13,12 @@ export const ScannerOverlay: React.FC<ScannerOverlayProps> = ({ onScan, onClose 
 
   useEffect(() => {
     let scanner: Html5Qrcode | null = null;
+    let isScannerRunning = false;
 
     const cleanup = () => {
-      if (scanner) {
+      if (scanner && isScannerRunning) {
         scanner.stop().catch(console.error);
+        isScannerRunning = false;
       }
     };
 
@@ -56,7 +58,10 @@ export const ScannerOverlay: React.FC<ScannerOverlayProps> = ({ onScan, onClose 
               isScanned = true;
               onScan(decodedText);
               // 停止扫描
-              scanner?.stop().catch(console.error);
+              if (scanner && isScannerRunning) {
+                scanner.stop().catch(console.error);
+                isScannerRunning = false;
+              }
             }
           },
           (errorMessage) => {
@@ -64,6 +69,7 @@ export const ScannerOverlay: React.FC<ScannerOverlayProps> = ({ onScan, onClose 
           }
         );
 
+        isScannerRunning = true;
         setHasPermission(true);
       } catch (err: any) {
         console.error("Scanner error:", err);
